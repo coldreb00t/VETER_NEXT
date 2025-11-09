@@ -1,0 +1,22 @@
+[Unit]
+Description=VETER_NEXT CAN Interface Configuration
+Documentation=https://github.com/coldreb00t/VETER_NEXT
+After=network.target
+Before=veter.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '\
+    modprobe can && \
+    modprobe can_raw && \
+    modprobe mttcan && \
+    ip link set can0 down 2>/dev/null || true && \
+    ip link set can0 type can bitrate 1000000 && \
+    ip link set can0 txqueuelen 1000 && \
+    ip link set can0 up'
+ExecStop=/bin/bash -c 'ip link set can0 down'
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
