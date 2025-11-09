@@ -25,9 +25,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Computing
 - **Main**: NVIDIA Jetson Orin Nano Super Developer Kit (8GB, 40 TOPS)
-- **MCU #1**: ESP32-S3 (16MB Flash, 8MB PSRAM) - Motor Controller
-- **MCU #2**: ESP32-S3 (16MB Flash, 8MB PSRAM) - Sensor Hub
-- **Flight Controller**: Radiolink Crossflight (ArduRover 4.5.x)
+- **MCU #1**: ESP32-S3 (16MB Flash, 8MB PSRAM) - Motor Controller (DroneCAN Node ID 10)
+- **MCU #2**: ESP32-S3 (16MB Flash, 8MB PSRAM) - Sensor Hub (DroneCAN Node ID 11)
+- **Flight Controller**: Mini Pixhawk (ArduRover firmware) - GPS/IMU/Compass
 
 ### Propulsion
 - **Motors**: 2x BM1418ZXF BLDC 1000W 48V
@@ -292,8 +292,19 @@ ros2 topic echo /cmd_vel
 
 ## Documentation
 
+### Core Documentation
 - `docs/README.md` - Main project documentation
-- `docs/DRONECAN_SETUP.md` - DroneCAN configuration guide
+- `docs/CAN_SETUP.md` - CAN bus configuration guide (✅ Complete)
+- `docs/INSTALLATION.md` - Software installation guide (✅ Complete)
+- `docs/DEVELOPMENT_STATUS.md` - **Current project status** (✅ Updated Nov 9, 2025)
+- `docs/PIXHAWK_INTEGRATION_OPTIONS.md` - **Mini Pixhawk integration options** (⏸️ Decision pending)
+
+### Component Documentation
+- `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
+- `firmware/esp32_sensor_hub/README.md` - Sensor hub firmware (✅ Complete)
+- `ros2_ws/src/veter_dronecan_bridge/README.md` - DroneCAN bridge package (✅ Complete)
+
+### Planned Documentation
 - `docs/FAILSAFE_LOGIC.md` - Failsafe system documentation
 - `docs/SECURITY_MODE.md` - Security patrol mode guide
 - `docs/VOICE_CONTROL.md` - Voice control setup
@@ -320,5 +331,69 @@ git log --oneline
 
 ---
 
-**Development Phase**: PHASE 1 - Basic Platform
+## 📊 Current Development Status (November 9, 2025)
+
+### PHASE 1 Progress: 75% Complete
+
+#### ✅ Completed Components
+1. **Infrastructure Setup**
+   - Remote SSH access via VPS tunnel (port 2223)
+   - Git repository connected to GitHub
+   - Complete directory structure
+   - ROS2 Humble + Navigation2 installed
+   - CAN interface configured (can0 @ 1 Mbps)
+
+2. **ESP32 Motor Controller Firmware** (1,077 lines)
+   - DroneCAN Node ID: 10
+   - CRSF/ExpressLRS input (420k baud)
+   - Differential steering mixing
+   - Hardware emergency stop
+   - Failsafe modes
+   - Status: ✅ **Ready for hardware testing**
+
+3. **ESP32 Sensor Hub Firmware** (1,618 lines)
+   - DroneCAN Node ID: 11
+   - 4x HC-SR04 ultrasonic sensors
+   - BME280 environmental sensor
+   - Camera servo control (pan/tilt)
+   - 4-channel LED lighting
+   - Collision detection
+   - Status: ✅ **Ready for hardware testing**
+
+4. **ROS2 DroneCAN Bridge** (1,131 lines)
+   - DroneCAN Node ID: 20
+   - Bidirectional CAN ↔ ROS2 bridge
+   - 10 ROS2 topics (sensors, control, status)
+   - Successfully built with colcon
+   - Status: ✅ **Ready for testing**
+
+#### ⏸️ Pending Decision
+**Mini Pixhawk Integration Architecture**
+- See `docs/PIXHAWK_INTEGRATION_OPTIONS.md` for detailed analysis
+- 3 options documented with pros/cons
+- Decision needed before proceeding
+
+#### 🔜 Next Tasks (After Pixhawk Decision)
+1. ROS2 Bringup package
+2. Master launch files
+3. Systemd auto-start service
+4. Hardware integration testing
+
+#### 📈 Statistics
+- **Total Code:** 3,826 lines
+- **Files Created:** 28
+- **Git Commits:** 6
+- **Documentation:** 5 major documents
+
+### Important Notes for Claude Code
+- **Current blocker:** Architectural decision on Mini Pixhawk integration role
+- **Read first:** `docs/DEVELOPMENT_STATUS.md` for complete status
+- **Review options:** `docs/PIXHAWK_INTEGRATION_OPTIONS.md` before proceeding
+- **All firmware ready:** ESP32 code complete, awaiting hardware test
+- **ROS2 bridge functional:** Builds successfully, ready for CAN testing
+
+---
+
+**Development Phase**: PHASE 1 - Basic Platform (75% complete)
 **Priority**: Safety and fail-safe mechanisms first, features second
+**Next Session:** Review Pixhawk integration options and make architectural decision
