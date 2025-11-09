@@ -1,0 +1,25 @@
+[Unit]
+Description=SSH Reverse Tunnel to VPS for Jetson Robot Project
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jetson
+Restart=always
+RestartSec=10
+StartLimitInterval=0
+
+# Reverse SSH tunnel: VPS:2223 -> localhost:22
+# This allows accessing Jetson via: ssh -p 2223 jetson@81.200.157.230
+ExecStart=/usr/bin/ssh -N \
+    -o ServerAliveInterval=30 \
+    -o ServerAliveCountMax=3 \
+    -o ExitOnForwardFailure=yes \
+    -o StrictHostKeyChecking=accept-new \
+    -i /home/jetson/.ssh/id_ed25519_vps \
+    -R 2223:localhost:22 \
+    root@81.200.157.230
+
+[Install]
+WantedBy=multi-user.target
