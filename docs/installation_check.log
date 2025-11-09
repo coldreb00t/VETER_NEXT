@@ -1,0 +1,30 @@
+VETER_NEXT - Software Installation Check
+Date: $(date)
+Platform: NVIDIA Jetson Orin Nano
+==============================================
+
+=== System Information ===
+=== Checking ROS2 Installation ===
+✗ ROS2 NOT FOUND
+
+=== Checking Python and pip ===
+Python 3.10.12
+/bin/bash: line 6: pip3: command not found
+=== Checking PlatformIO ===
+✗ PlatformIO NOT FOUND
+
+=== Checking Python libraries ===
+✗ pydronecan NOT FOUND
+✗ ultralytics NOT FOUND
+✗ transformers NOT FOUND
+✗ telegram NOT FOUND
+
+=== Checking disk space ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p1  467G   20G  425G   5% /
+
+=== Checking available memory ===
+               total        used        free      shared  buff/cache   available
+Mem:           7.4Gi       1.1Gi       5.5Gi        36Mi       839Mi       6.1Gi
+Swap:          3.7Gi          0B       3.7Gi
+
