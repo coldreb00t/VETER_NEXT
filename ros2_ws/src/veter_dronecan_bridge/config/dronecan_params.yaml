@@ -1,0 +1,13 @@
+dronecan_bridge:
+  ros__parameters:
+    # CAN interface settings
+    can_interface: 'can0'
+    can_bitrate: 1000000  # 1 Mbps
+
+    # DroneCAN node IDs
+    jetson_node_id: 20
+    motor_controller_node_id: 10
+    sensor_hub_node_id: 11
+
+    # Publishing rate (Hz)
+    publish_rate: 10.0
