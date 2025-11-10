@@ -1,10 +1,19 @@
 # ESP32 Motor Controller Firmware
 
+> **See Also**: [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) - Detailed development notes and incremental testing process
+
 ## Overview
 
-This firmware runs on an ESP32-S3 module and serves as the primary motor controller for VETER_NEXT. It receives CRSF commands from an ExpressLRS receiver and converts them to DroneCAN ESC commands for VESC motor controllers.
+This firmware runs on an **ESP32-S3-DevKitC-1 v1.0** (N16R8: 16MB Flash + 8MB PSRAM) and serves as the primary motor controller for VETER_NEXT. It receives CRSF commands from an ExpressLRS receiver and converts them to DroneCAN ESC commands for VESC motor controllers.
 
 **DroneCAN Node ID**: 10
+
+**Current Status** (Nov 10, 2025):
+- ✅ Base platform stable (ESP32, Serial, SPI, LED)
+- ✅ CRSF/ExpressLRS input initialized
+- ✅ MCP2515 CAN controller initialized
+- ⏳ DroneCAN protocol stack (in development)
+- ⏳ Motor control logic (pending)
 
 ## Features
 
@@ -36,8 +45,10 @@ Safety:
 - E-STOP: GPIO 23 (INPUT_PULLUP, active LOW)
 
 Status:
-- LED:   GPIO 19 (WS2812B data pin)
+- LED:   GPIO 48 (WS2812B RGB LED - onboard on v1.0)
 ```
+
+**Note**: ESP32-S3-DevKitC-1 v1.0 has RGB LED on GPIO48, v1.1 uses GPIO38.
 
 ### ExpressLRS Connection
 
@@ -72,9 +83,17 @@ pio run -t upload
 
 ### Monitor Serial Output
 
+**Via SSH (recommended)**:
+```bash
+python3 /home/jetson/jetson-robot-project/scripts/esp32_monitor.py
+```
+
+**Local terminal**:
 ```bash
 pio device monitor
 ```
+
+**Note**: `pio device monitor` may not work over SSH with ESP32-S3 USB CDC. Use the Python script instead.
 
 ## Configuration
 
@@ -124,12 +143,16 @@ All configuration is in `include/config.h`:
 
 | Color | State |
 |-------|-------|
-| BLUE | Booting |
-| GREEN (solid) | Normal operation, RC connected |
-| YELLOW (blinking) | No RC signal |
-| RED (fast blink) | Emergency stop activated |
+| BLUE | Booting (during initialization) |
+| GREEN (blinking) | Normal operation |
+| YELLOW | No RC signal |
+| RED | Emergency stop activated |
 | MAGENTA | CAN bus error |
-| ORANGE | Other failsafe condition |
+
+**Current Implementation** (Nov 10, 2025):
+- 🔴 RED (solid): E-Stop active
+- 🟡 YELLOW (solid): No RC signal after initial connection
+- 🟢 GREEN (blinking 1 Hz): Normal operation
 
 ### Failsafe Behavior
 
@@ -250,4 +273,6 @@ Part of VETER_NEXT project.
 
 ---
 
-*Last Updated: November 2025*
+*Last Updated: November 10, 2025*
+
+*Board Confirmed: ESP32-S3-DevKitC-1 v1.0 (RGB LED on GPIO48)*

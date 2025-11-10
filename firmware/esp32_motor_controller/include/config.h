@@ -32,7 +32,7 @@
 #define ESTOP_DEBOUNCE_MS   50  // Debounce time in milliseconds
 
 // Status LED (WS2812B)
-#define LED_PIN         19      // Data pin for WS2812B LED strip
+#define LED_PIN         48      // Data pin for onboard RGB LED (GPIO48 on ESP32-S3-DevKitC-1 v1.0)
 #define LED_COUNT       1       // Number of LEDs
 
 // ============================================================================

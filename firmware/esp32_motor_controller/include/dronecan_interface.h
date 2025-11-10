@@ -6,7 +6,8 @@
 #ifndef DRONECAN_INTERFACE_H
 #define DRONECAN_INTERFACE_H
 
-#include <mcp2515_can.h>
+#include <mcp2515.h>
+#include <SPI.h>
 
 // Function prototypes
 bool DroneCAN_Init(void);
