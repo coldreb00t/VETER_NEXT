@@ -1,0 +1,41 @@
+# Default Channel Manager Configuration
+# All 6 channels enabled with fiber optic as primary
+
+channel_manager:
+  # Enable all communication channels
+  enabled_channels:
+    - fiber
+    - starlink
+    - 4g
+    - wifi
+    - dmr
+    - expresslrs
+
+  # Priority chain (1 = highest priority)
+  # Operator can modify this order based on mission requirements
+  priority_chain:
+    1: fiber        # Primary: Fiber optic (lowest latency, up to 3km)
+    2: starlink     # Secondary: Starlink Mini (global coverage)
+    3: 4g           # Tertiary: 4G/5G cellular (good coverage)
+    4: wifi         # Quaternary: WiFi (short range, high bandwidth)
+    5: dmr          # Quinary: DMR radio (voice control, emergency)
+    6: expresslrs   # Last resort: ExpressLRS (always available, manual RC)
+    7: safe_stop    # Final failsafe: Stop all motors
+
+  # Timeout for each channel (seconds)
+  # If no data received within timeout, channel considered failed
+  timeouts:
+    fiber: 2.0        # Fiber should have low latency
+    starlink: 3.0     # Satellite may have higher latency
+    4g: 3.0           # Cellular may have variable latency
+    wifi: 2.0         # WiFi should be fast
+    dmr: 5.0          # Voice commands may be slower
+    expresslrs: 1.0   # RC link should be very fast
+
+  # Hysteresis time (seconds)
+  # Minimum time before switching back to higher priority channel
+  # Prevents rapid channel switching (flapping)
+  hysteresis_time: 5.0
+
+  # Update rate for health monitoring (Hz)
+  update_rate: 10.0

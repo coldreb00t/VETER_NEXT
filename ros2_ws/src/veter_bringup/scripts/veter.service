@@ -1,0 +1,21 @@
+[Unit]
+Description=VETER_NEXT Robot Control System
+After=network.target can0.service
+Wants=can0.service
+
+[Service]
+Type=simple
+User=jetson
+Group=jetson
+Environment="ROS_DOMAIN_ID=0"
+Environment="ROS_LOCALHOST_ONLY=0"
+WorkingDirectory=/home/jetson/jetson-robot-project/ros2_ws
+ExecStartPre=/bin/sleep 5
+ExecStart=/bin/bash -c "source /opt/ros/humble/setup.bash && source install/setup.bash && ros2 launch veter_bringup veter_minimal.launch.py"
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

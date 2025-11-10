@@ -1,0 +1,43 @@
+# VETER_NEXT Robot Parameters
+
+robot:
+  name: "veter_next"
+  type: "tracked"
+  description: "Versatile Electronic Terrain Explorer Robot"
+  
+dimensions:
+  length: 1.2  # meters
+  width: 0.8   # meters  
+  height: 0.5  # meters
+  track_width: 0.8  # distance between tracks
+  
+battery:
+  type: "18S_LiFePO4"
+  cells: 18
+  nominal_voltage: 57.6  # V (3.2V per cell)
+  full_voltage: 65.7     # V (3.65V per cell)
+  low_voltage: 50.4      # V (2.8V per cell)
+  critical_voltage: 46.8 # V (2.6V per cell)
+  capacity: 105.0        # Ah
+  max_discharge: 300.0   # A
+  
+motors:
+  type: "BM1418ZXF"
+  count: 2
+  max_rpm: 3000
+  max_torque: 5.0  # Nm
+  power: 1000  # W per motor
+  voltage: 48  # V
+  
+tracks:
+  circumference: 2.82  # meters
+  width: 0.22  # meters
+  
+max_speed:
+  linear: 2.0  # m/s
+  angular: 1.5  # rad/s
+  
+safety:
+  emergency_stop_pin: 23  # GPIO pin
+  failsafe_timeout: 1.0   # seconds
+  max_temperature: 70.0   # °C

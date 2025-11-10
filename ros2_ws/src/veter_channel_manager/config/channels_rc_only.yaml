@@ -1,0 +1,22 @@
+# RC Only Configuration
+# Only ExpressLRS channel enabled for pure manual control
+
+channel_manager:
+  # Single channel: ExpressLRS RC receiver
+  enabled_channels:
+    - expresslrs
+
+  # Priority chain: RC only, then safe stop
+  priority_chain:
+    1: expresslrs   # Manual RC control only
+    2: safe_stop    # Failsafe if RC signal lost
+
+  # Timeout for RC channel
+  timeouts:
+    expresslrs: 1.0   # Fast timeout for safety
+
+  # No hysteresis needed with single channel
+  hysteresis_time: 0.0
+
+  # Update rate
+  update_rate: 10.0

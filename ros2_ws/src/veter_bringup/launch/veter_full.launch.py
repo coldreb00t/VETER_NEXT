@@ -1,24 +1,28 @@
 #!/usr/bin/env python3
 """
-Minimal VETER_NEXT Launch File
+Full VETER_NEXT Launch File
 
-Launches essential components for basic robot operation:
-- DroneCAN Bridge (communication with ESP32 controllers)
-- Channel Manager (RC-only mode for manual control)
+Launches complete robot system:
+- DroneCAN Bridge (ESP32 communication)
+- Channel Manager (multi-channel failover)
+- MAVROS (Mini Pixhawk GPS/IMU)
+- Future: Navigation2, Vision pipeline
 
 Usage:
-    ros2 launch veter_bringup veter_minimal.launch.py
+    ros2 launch veter_bringup veter_full.launch.py
+    ros2 launch veter_bringup veter_full.launch.py channel_config:=channels_long_range.yaml
 """
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.conditions import IfCondition
 from launch_ros.substitutions import FindPackageShare
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
-    """Generate minimal launch description"""
+    """Generate full system launch description"""
 
     # Declare launch arguments
     use_sim_time_arg = DeclareLaunchArgument(
@@ -31,6 +35,18 @@ def generate_launch_description():
         'can_interface',
         default_value='can0',
         description='CAN interface name'
+    )
+
+    channel_config_arg = DeclareLaunchArgument(
+        'channel_config',
+        default_value='channels_default.yaml',
+        description='Channel manager configuration file'
+    )
+
+    enable_mavros_arg = DeclareLaunchArgument(
+        'enable_mavros',
+        default_value='true',
+        description='Enable MAVROS (Mini Pixhawk)'
     )
 
     # DroneCAN Bridge launch
@@ -48,7 +64,7 @@ def generate_launch_description():
         }.items()
     )
 
-    # Channel Manager launch (RC-only mode)
+    # Channel Manager launch
     channel_manager_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
@@ -58,13 +74,28 @@ def generate_launch_description():
             ])
         ]),
         launch_arguments={
-            'config': 'channels_rc_only.yaml',  # RC-only mode
+            'config': LaunchConfiguration('channel_config'),
         }.items()
+    )
+
+    # MAVROS launch (conditional, when Pixhawk connected)
+    mavros_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('veter_bringup'),
+                'launch',
+                'mavros.launch.py'
+            ])
+        ]),
+        condition=IfCondition(LaunchConfiguration('enable_mavros'))
     )
 
     return LaunchDescription([
         use_sim_time_arg,
         can_interface_arg,
+        channel_config_arg,
+        enable_mavros_arg,
         dronecan_bridge_launch,
         channel_manager_launch,
+        mavros_launch,
     ])

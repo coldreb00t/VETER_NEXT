@@ -1,0 +1,30 @@
+# Long Range Configuration
+# Optimized for missions beyond line-of-sight
+# Prioritizes satellite and cellular over local channels
+
+channel_manager:
+  # Long-range channels enabled
+  enabled_channels:
+    - starlink      # Satellite (global coverage)
+    - 4g            # Cellular (wide coverage)
+    - expresslrs    # RC backup (line-of-sight only)
+
+  # Priority chain: Satellite → Cellular → RC backup
+  priority_chain:
+    1: starlink     # Primary: Starlink for global coverage
+    2: 4g           # Secondary: 4G/5G cellular
+    3: expresslrs   # Tertiary: RC manual override
+    4: safe_stop    # Failsafe
+
+  # Timeouts adjusted for long-range latency
+  timeouts:
+    starlink: 5.0     # Satellite has higher latency
+    4g: 4.0           # Cellular may have variable latency
+    expresslrs: 1.0   # RC should be fast when available
+
+  # Longer hysteresis for satellite connections
+  # Prevents switching away from satellite on brief hiccups
+  hysteresis_time: 10.0
+
+  # Update rate
+  update_rate: 10.0

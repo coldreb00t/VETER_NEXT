@@ -1,0 +1,29 @@
+# Voice Control Configuration
+# Optimized for DMR voice command operations
+# Voice commands via DMR radio with WiFi and RC backup
+
+channel_manager:
+  # Voice-optimized channels
+  enabled_channels:
+    - dmr           # DMR radio for voice commands
+    - wifi          # WiFi for local high-bandwidth control
+    - expresslrs    # RC manual override
+
+  # Priority chain: Voice → WiFi → RC backup
+  priority_chain:
+    1: dmr          # Primary: DMR voice commands
+    2: wifi         # Secondary: WiFi teleop
+    3: expresslrs   # Tertiary: RC manual override
+    4: safe_stop    # Failsafe
+
+  # Timeouts adjusted for voice processing latency
+  timeouts:
+    dmr: 8.0          # Voice commands need longer processing time
+    wifi: 2.0         # WiFi should be fast
+    expresslrs: 1.0   # RC should be very fast
+
+  # Moderate hysteresis to allow voice mode to remain active
+  hysteresis_time: 7.0
+
+  # Update rate
+  update_rate: 10.0
