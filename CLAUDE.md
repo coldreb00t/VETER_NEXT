@@ -120,11 +120,16 @@ python3 scripts/diagnostics/can_monitor.py
 ```bash
 # Flash motor controller
 cd firmware/esp32_motor_controller
-pio run -t upload
+pio run -t upload --upload-port /dev/ttyACM1
 
-# Monitor serial output
-pio device monitor
+# Monitor serial output (recommended - works with USB CDC)
+python3 scripts/esp32_monitor.py
+
+# Alternative: PlatformIO monitor (may not work over SSH)
+pio device monitor --port /dev/ttyACM1
 ```
+
+**Note:** ESP32-S3 uses USB CDC (USB Serial) which requires pyserial to open properly. Use `scripts/esp32_monitor.py` for reliable serial monitoring.
 
 ### ROS2 Development
 ```bash
