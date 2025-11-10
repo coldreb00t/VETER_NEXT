@@ -15,12 +15,10 @@
 // HARDWARE PIN DEFINITIONS
 // ============================================================================
 
-// CAN Bus (MCP2515 SPI interface)
-#define CAN_CS_PIN      5       // Chip Select
-#define CAN_INT_PIN     4       // Interrupt pin
-#define SPI_MOSI_PIN    11      // SPI MOSI
-#define SPI_MISO_PIN    13      // SPI MISO
-#define SPI_SCK_PIN     12      // SPI SCK
+// CAN Bus (ESP32 TWAI with WCMCU-230 transceiver)
+// WCMCU-230: SN65HVD230 3.3V transceiver with built-in 120Ω termination
+#define CAN_TX_PIN      4       // TWAI TX to WCMCU-230 TXD
+#define CAN_RX_PIN      5       // TWAI RX from WCMCU-230 RXD
 
 // CRSF/ExpressLRS Receiver
 // Physical connection: GPIO15 and GPIO16 used

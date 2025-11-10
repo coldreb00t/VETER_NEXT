@@ -6,8 +6,6 @@
 
 #include <Arduino.h>
 #include <FastLED.h>
-#include <SPI.h>
-#include <mcp2515.h>
 #include "CRSFforArduino.hpp"
 #include "config.h"
 #include "dronecan_interface.h"
@@ -15,9 +13,6 @@
 
 // Status LED
 CRGB leds[LED_COUNT];
-
-// MCP2515 CAN controller
-MCP2515 mcp2515(CAN_CS_PIN);
 
 // CRSF (ExpressLRS) receiver
 CRSFforArduino *crsf = nullptr;
@@ -61,22 +56,6 @@ void setup() {
     emergency_stop_active = (digitalRead(EMERGENCY_STOP_PIN) == LOW);
     Serial.printf("[OK] Emergency Stop Pin initialized (State: %s)\n",
                   emergency_stop_active ? "ACTIVE" : "INACTIVE");
-
-    // Initialize SPI for MCP2515
-    SPI.begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, CAN_CS_PIN);
-    Serial.println("[OK] SPI initialized");
-
-    // Initialize MCP2515
-    mcp2515.reset();
-    MCP2515::ERROR can_error = mcp2515.setBitrate(CAN_BITRATE, MCP_8MHZ);
-    if (can_error == MCP2515::ERROR_OK) {
-        mcp2515.setNormalMode();
-        Serial.println("[OK] MCP2515 CAN initialized (1 Mbps)");
-    } else {
-        Serial.printf("[ERROR] MCP2515 init failed: %d\n", can_error);
-        leds[0] = CRGB::Red;
-        FastLED.show();
-    }
 
     // Initialize CRSF (ExpressLRS)
     Serial1.begin(CRSF_BAUDRATE, SERIAL_8N1, CRSF_RX_PIN, CRSF_TX_PIN);

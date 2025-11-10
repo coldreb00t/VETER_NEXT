@@ -1,13 +1,13 @@
 /**
  * @file dronecan_interface.h
- * @brief DroneCAN interface header
+ * @brief DroneCAN interface header using ESP32 TWAI
  */
 
 #ifndef DRONECAN_INTERFACE_H
 #define DRONECAN_INTERFACE_H
 
-#include <mcp2515.h>
-#include <SPI.h>
+#include <Arduino.h>
+#include "driver/twai.h"
 
 // Function prototypes
 bool DroneCAN_Init(void);
