@@ -76,6 +76,15 @@ static uint32_t encodeDroneCAN_ID(uint8_t priority, uint16_t msg_type_id, uint8_
     return can_id;
 }
 
+/**
+ * @brief Decode DroneCAN CAN ID to extract components
+ */
+static void decodeDroneCAN_ID(uint32_t can_id, uint8_t* priority, uint16_t* msg_type_id, uint8_t* source_node_id) {
+    *priority = (can_id >> 24) & 0x1F;
+    *msg_type_id = (can_id >> 8) & 0xFFFF;
+    *source_node_id = (can_id >> 1) & 0x7F;
+}
+
 // ============================================================================
 // TWAI HELPER FUNCTIONS
 // ============================================================================
@@ -164,6 +173,7 @@ bool DroneCAN_Init(void) {
     DEBUG_PRINTLN("[DroneCAN] Initializing TWAI controller...");
 
     // TWAI general configuration
+    // NORMAL mode - requires ACK from other nodes
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(
         (gpio_num_t)CAN_TX_PIN,
         (gpio_num_t)CAN_RX_PIN,
@@ -341,26 +351,65 @@ void DroneCAN_Process(void) {
     }
 
     // Process incoming messages (non-blocking)
+    static uint32_t rx_count = 0;
     twai_message_t rx_message;
     while (TWAI_ReceiveMessage(&rx_message)) {
-        // Handle received messages here (future expansion)
-        // For now, we only transmit (motor controller role)
+        rx_count++;
 
-        #if DEBUG_DRONECAN
-        DEBUG_PRINTF("[DroneCAN] RX: ID=0x%08lX, DLC=%d\n",
+        // Decode CAN ID
+        uint8_t priority;
+        uint16_t msg_type_id;
+        uint8_t source_node_id;
+        decodeDroneCAN_ID(rx_message.identifier, &priority, &msg_type_id, &source_node_id);
+
+        // Print received message with decoding
+        DEBUG_PRINTF("[CAN RX #%lu] ID=0x%08lX | Type=%d Node=%d | DLC=%d | Data: ",
+                     rx_count,
                      rx_message.identifier,
+                     msg_type_id,
+                     source_node_id,
                      rx_message.data_length_code);
-        #endif
+
+        for (int i = 0; i < rx_message.data_length_code; i++) {
+            DEBUG_PRINTF("%02X ", rx_message.data[i]);
+        }
+        DEBUG_PRINTLN();
+
+        // Decode known message types
+        if (msg_type_id == UAVCAN_ESC_STATUS_ID) {
+            DEBUG_PRINTF("    └─> ESC Status from Node %d\n", source_node_id);
+        } else if (msg_type_id == UAVCAN_NODE_STATUS_ID) {
+            DEBUG_PRINTF("    └─> NodeStatus (Heartbeat) from Node %d\n", source_node_id);
+        }
     }
 
-    // Check for bus errors and recover if needed
-    twai_status_info_t status;
-    if (twai_get_status_info(&status) == ESP_OK) {
-        if (status.state == TWAI_STATE_BUS_OFF) {
-            DEBUG_PRINTLN("[TWAI] Bus-off detected, attempting recovery...");
-            twai_initiate_recovery();
-            delay(100);
-            twai_start();
+    // Print TWAI statistics every 5 seconds
+    static uint32_t last_stats_print = 0;
+    if (millis() - last_stats_print >= 5000) {
+        last_stats_print = millis();
+
+        twai_status_info_t status;
+        if (twai_get_status_info(&status) == ESP_OK) {
+            DEBUG_PRINTLN("\n========== TWAI STATISTICS ==========");
+            DEBUG_PRINTF("State: %s\n",
+                status.state == TWAI_STATE_STOPPED ? "STOPPED" :
+                status.state == TWAI_STATE_RUNNING ? "RUNNING" :
+                status.state == TWAI_STATE_BUS_OFF ? "BUS_OFF" :
+                status.state == TWAI_STATE_RECOVERING ? "RECOVERING" : "UNKNOWN");
+            DEBUG_PRINTF("TX Queue: %lu msgs\n", status.msgs_to_tx);
+            DEBUG_PRINTF("RX Queue: %lu msgs\n", status.msgs_to_rx);
+            DEBUG_PRINTF("TX Errors: %lu\n", status.tx_error_counter);
+            DEBUG_PRINTF("RX Errors: %lu\n", status.rx_error_counter);
+            DEBUG_PRINTF("Total RX: %lu msgs\n", rx_count);
+            DEBUG_PRINTLN("=====================================\n");
+
+            // Check for bus errors and recover if needed
+            if (status.state == TWAI_STATE_BUS_OFF) {
+                DEBUG_PRINTLN("[TWAI] Bus-off detected, attempting recovery...");
+                twai_initiate_recovery();
+                delay(100);
+                twai_start();
+            }
         }
     }
 }

@@ -92,7 +92,9 @@ void loop() {
     // ========================================
     // 1. Check emergency stop
     // ========================================
-    emergency_stop_active = (digitalRead(EMERGENCY_STOP_PIN) == LOW);
+    // TEMPORARY: Disable E-Stop for CAN testing
+    emergency_stop_active = false;  // Force disabled
+    // emergency_stop_active = (digitalRead(EMERGENCY_STOP_PIN) == LOW);
 
     // ========================================
     // 2. Update CRSF and read all 12 channels
