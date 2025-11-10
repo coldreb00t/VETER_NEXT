@@ -23,8 +23,11 @@
 #define SPI_SCK_PIN     12      // SPI SCK
 
 // CRSF/ExpressLRS Receiver
-#define CRSF_RX_PIN     16      // UART RX from ExpressLRS
-#define CRSF_TX_PIN     17      // UART TX to ExpressLRS (optional)
+// Physical connection: GPIO15 and GPIO16 used
+// User confirmed: ExpressLRS RX → GPIO16, ExpressLRS TX → GPIO15
+// So we swap the pins in code to match physical wiring
+#define CRSF_RX_PIN     15      // UART RX from ExpressLRS TX (physically on GPIO15)
+#define CRSF_TX_PIN     16      // UART TX to ExpressLRS RX (physically on GPIO16)
 #define CRSF_BAUDRATE   420000  // ExpressLRS standard baudrate
 
 // Emergency Stop
