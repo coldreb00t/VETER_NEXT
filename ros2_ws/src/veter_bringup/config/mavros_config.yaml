@@ -1,66 +1,76 @@
-# MAVROS Configuration for Mini Pixhawk (ArduRover)
+# MAVROS Configuration for Crossflight (ArduRover) - ROS2 Format
+# Based on official apm_config.yaml and apm_pluginlists.yaml
 
-mavros:
+/**:
   ros__parameters:
     # Connection settings
-    fcu_protocol: "v2.0"  # MAVLink 2.0
-    system_id: 20         # ROS2 system ID
-    component_id: 240     # Ground Control Station component
-    
-    # Plugin settings
+    fcu_protocol: "v2.0"
+    system_id: 20
+    component_id: 240
+
+    # Plugin allowlist - only essential plugins for GPS/IMU
     plugin_allowlist:
-      - sys_status
-      - sys_time
-      - gps
       - imu
+      - gps_status
       - global_position
       - local_position
-      - setpoint_velocity
+      - sys
       - command
-      - waypoint
-      - mission
       - param
-      - rc
       - battery
-      
-    # GPS plugin
-    gps:
-      frame_id: "gps"
-      
-    # IMU plugin  
-    imu:
-      frame_id: "imu"
-      angular_velocity_stdev: 0.0003490659  # 0.02 deg/s
-      linear_acceleration_stdev: 0.0003   # m/s^2
-      orientation_stdev: 0.0001745329     # 0.01 deg
-      
-    # Global position plugin
-    global_position:
+      - rc_io
+      - time
+
+# IMU plugin configuration
+/**/imu:
+  ros__parameters:
+    frame_id: "base_link"
+    linear_acceleration_stdev: 0.0003
+    angular_velocity_stdev: 0.0003490659
+    orientation_stdev: 1.0
+    magnetic_stdev: 0.0
+
+# Global position plugin
+/**/global_position:
+  ros__parameters:
+    frame_id: "map"
+    child_frame_id: "base_link"
+    rot_covariance: 0.0001745329
+    use_relative_alt: true
+    tf:
+      send: false
+      frame_id: "map"
+      global_frame_id: "earth"
+      child_frame_id: "base_link"
+
+# Local position plugin
+/**/local_position:
+  ros__parameters:
+    frame_id: "map"
+    tf:
+      send: false
       frame_id: "map"
       child_frame_id: "base_link"
-      rot_covariance: 0.0001745329
-      use_relative_alt: true
-      
-    # Local position plugin
-    local_position:
-      frame_id: "map"
-      tf_send: false
-      tf_frame_id: "map"
-      tf_child_frame_id: "base_link"
-      
-    # Setpoint velocity plugin
-    setpoint_velocity:
-      mav_frame: LOCAL_NED
-      
-    # Command plugin
-    command:
-      use_comp_id_system_control: false
-      
-    # Waypoint/Mission plugins
-    waypoint:
-      pull_after_gcs: true
-      use_mission_item_int: true
-      
-    # Battery plugin
-    battery:
-      voltage_cov: 0.01  # V
+
+# System plugin
+/**/sys:
+  ros__parameters:
+    min_voltage: [10.0]
+    disable_diag: false
+
+# Time sync plugin
+/**/time:
+  ros__parameters:
+    time_ref_source: "fcu"
+    timesync_mode: MAVLINK
+    timesync_avg_alpha: 0.6
+
+# Command plugin
+/**/cmd:
+  ros__parameters:
+    use_comp_id_system_control: false
+
+# Battery plugin
+/**/battery:
+  ros__parameters:
+    voltage_cov: 0.01

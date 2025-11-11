@@ -23,8 +23,8 @@ def generate_launch_description():
     # Declare launch arguments
     fcu_url_arg = DeclareLaunchArgument(
         'fcu_url',
-        default_value='/dev/ttyTHS0:921600',
-        description='FCU connection URL (serial:///dev/ttyTHS0:921600 for Jetson UART)'
+        default_value='/dev/ttyACM0:115200',
+        description='FCU connection URL (Mini Pixhawk via USB: /dev/ttyACM0:115200)'
     )
 
     gcs_url_arg = DeclareLaunchArgument(

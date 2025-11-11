@@ -170,6 +170,27 @@ python3 scripts/diagnostics/system_health.py
 bash scripts/diagnostics/dronecan_gui.sh
 ```
 
+### MAVROS (GPS/IMU Integration)
+```bash
+# Launch MAVROS for GPS/IMU from Crossflight
+cd ros2_ws
+source /opt/ros/humble/setup.bash && source install/setup.bash
+ros2 launch veter_bringup mavros.launch.py
+
+# View IMU data (10 Hz)
+ros2 topic echo /mavros/mavros/data_raw
+
+# View GPS data (10 Hz)
+ros2 topic echo /mavros/mavros/global
+
+# Check publication rates
+ros2 topic hz /mavros/mavros/data_raw
+ros2 topic hz /mavros/mavros/global
+
+# See full documentation
+cat docs/MAVROS_GPS_IMU_INTEGRATION.md
+```
+
 ## Development Guidelines
 
 ### DroneCAN Message Types
@@ -303,6 +324,7 @@ ros2 topic echo /cmd_vel
 - `docs/INSTALLATION.md` - Software installation guide (✅ Complete)
 - `docs/DEVELOPMENT_STATUS.md` - **Current project status** (✅ Updated Nov 9, 2025)
 - `docs/PIXHAWK_INTEGRATION_OPTIONS.md` - **Mini Pixhawk integration options** (⏸️ Decision pending)
+- `docs/MAVROS_GPS_IMU_INTEGRATION.md` - **GPS/IMU integration via MAVROS** (✅ Complete Nov 11, 2025)
 
 ### Component Documentation
 - `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
@@ -386,8 +408,17 @@ git log --oneline
    - Systemd auto-start service
    - Status: ✅ **Tested, system launches without errors**
 
+7. **MAVROS GPS/IMU Integration** (November 11, 2025)
+   - Connected to Radiolink Crossflight (ArduRover)
+   - MAVLink 2.0 protocol via USB (/dev/ttyACM0:115200)
+   - IMU data publishing at 10 Hz (/mavros/mavros/data_raw)
+   - GPS data publishing at 10 Hz (/mavros/mavros/global)
+   - U-blox M9N GPS module support
+   - ROS2 Humble compatible configuration
+   - Status: ✅ **Tested and operational** (see docs/MAVROS_GPS_IMU_INTEGRATION.md)
+
 #### ✅ Software Testing Complete
-**Test Date:** November 10, 2025
+**Test Date:** November 11, 2025 (updated)
 - ✅ ROS2 package compilation (all 3 packages)
 - ✅ System launch verification (`veter_minimal.launch.py`)
 - ✅ Topic creation validated (21 topics)
@@ -395,6 +426,9 @@ git log --oneline
 - ✅ ESP32 firmware execution test (via USB serial)
 - ✅ CAN interface operational (can0 @ 1 Mbps UP)
 - ✅ Configuration file loading
+- ✅ MAVROS GPS/IMU integration (`mavros.launch.py`)
+- ✅ IMU data streaming at 10 Hz
+- ✅ GPS data streaming at 10 Hz
 
 **System successfully launches and operates!**
 
@@ -408,30 +442,35 @@ git log --oneline
 6. Configure VESC for DroneCAN mode
 7. End-to-end integration testing
 
-#### ✅ Mini Pixhawk Architecture: DECIDED
-**Role:** GPS/IMU provider + Mission planning interface (NOT motor controller)
+#### ✅ Mini Pixhawk (Crossflight) Integration: COMPLETE
+**Role:** GPS/IMU provider via MAVROS + Mission planning interface (NOT motor controller)
+- ✅ **GPS/IMU data integrated** via MAVROS (November 11, 2025)
 - Motors always controlled via: Jetson → ESP32 → VESC (DroneCAN)
 - Manual mode: ExpressLRS → ESP32 (direct hardware path)
-- Auto mode: Jetson Nav2 uses GPS/IMU, sends cmd_vel
-- Mission planning: Via ArduRover Ground Control Station (QGroundControl)
+- Auto mode: Jetson Nav2 uses GPS/IMU from MAVROS, sends cmd_vel
+- Mission planning: Via ArduRover Ground Control Station (QGroundControl) - optional
 
 #### 📈 Statistics
-- **Total Code:** 5,176 lines
-- **Files Created:** 51
+- **Total Code:** 5,176 lines (firmware + ROS2 packages)
+- **Configuration:** ~250 lines (mavros_config.yaml, mavros.launch.py)
+- **Files Created:** 52 (added MAVROS_GPS_IMU_INTEGRATION.md)
 - **Git Commits:** 6 (will increase with next commit)
-- **Documentation:** 6 major documents
+- **Documentation:** 7 major documents
 
 ### Important Notes for Claude Code
 - **SOFTWARE 100% COMPLETE:** All code written, built, and tested
-- **HARDWARE NOT TESTED:** Physical integration pending
-- **Read first:** `docs/DEVELOPMENT_STATUS.md` for detailed test results
-- **System functional:** ROS2 system launches, 21 topics operational, 2 nodes running
-- **Next step:** Physical hardware assembly and wiring
+- **GPS/IMU INTEGRATED:** Crossflight connected via MAVROS (November 11, 2025)
+- **HARDWARE NOT TESTED:** Physical CAN/motor integration pending
+- **Read first:** `docs/MAVROS_GPS_IMU_INTEGRATION.md` for GPS/IMU details
+- **Also read:** `docs/DEVELOPMENT_STATUS.md` for overall test results
+- **System functional:** ROS2 system launches, GPS/IMU data flowing at 10 Hz
+- **Next step:** Nav2 sensor fusion or physical hardware assembly
 
 ---
 
-**Development Phase**: PHASE 1 - Basic Platform (95% complete)
+**Development Phase**: PHASE 1 - Basic Platform (98% complete)
 **Software Status**: ✅ COMPLETE and TESTED
+**GPS/IMU Status**: ✅ INTEGRATED via MAVROS
 **Hardware Status**: ⏸️ PENDING - Ready for physical integration
-**Priority**: Hardware assembly and testing
-**Next Session:** Physical CAN bus wiring, ESP32 firmware deployment, VESC configuration
+**Priority**: Nav2 integration with robot_localization OR hardware assembly
+**Next Session:** Sensor fusion (EKF) setup OR Physical CAN bus wiring
