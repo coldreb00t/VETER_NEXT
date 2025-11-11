@@ -1,0 +1,140 @@
+# EKF Configuration for VETER Robot
+# Fuses IMU and GPS data from MAVROS (Crossflight ArduRover)
+# for accurate pose estimation and odometry
+
+### ekf_filter_node
+ekf_filter_node:
+  ros__parameters:
+    # Frequency of the filter's output (Hz)
+    frequency: 30.0
+
+    # Period for publishing transforms (s). Set to 0 to disable TF broadcasting
+    # We'll broadcast TF to provide odometry → base_link transform
+    sensor_timeout: 0.1
+
+    # If true, publishes transform from world_frame to base_link_frame
+    two_d_mode: false
+
+    # Filter will compute transform from odom_frame to base_link_frame
+    # Frames of reference
+    map_frame: map              # World-fixed frame (for GPS)
+    odom_frame: odom            # Odometry frame (drift-free within short distances)
+    base_link_frame: base_link  # Robot's base frame
+    world_frame: odom           # Default world frame (use 'map' for GPS-based navigation)
+
+    # Transform publication
+    publish_tf: true            # Publish transforms
+    publish_acceleration: false  # Don't publish acceleration (not needed)
+
+    # Continuous mode means the filter runs at a fixed frequency
+    # regardless of measurement updates
+    use_control: false          # We don't have control inputs (wheel odometry)
+
+    # -------------------- IMU Configuration --------------------
+    # IMU data from MAVROS /mavros/data_raw
+    # ArduRover Crossflight with U-blox M9N GPS
+
+    imu0: /mavros/data_raw
+    imu0_config: [false, false, false,    # x, y, z position (not from IMU)
+                  true,  true,  true,     # roll, pitch, yaw (orientation from IMU)
+                  false, false, false,    # x_dot, y_dot, z_dot velocity (not from IMU)
+                  true,  true,  true,     # roll_dot, pitch_dot, yaw_dot (angular velocity)
+                  true,  true,  true]     # x_ddot, y_ddot, z_ddot (linear acceleration)
+
+    imu0_differential: false              # Use absolute measurements
+    imu0_relative: false                  # Not relative to previous measurement
+    imu0_queue_size: 10                   # Queue size for message buffering
+    imu0_remove_gravitational_acceleration: true  # Remove gravity from acceleration
+
+    # Frame for IMU (must match MAVROS config)
+    # Defined in mavros_config.yaml: frame_id: "base_link"
+
+    # -------------------- GPS Configuration --------------------
+    # GPS data converted to odometry by navsat_transform_node
+    # This will subscribe to /odometry/gps topic (created by navsat_transform)
+    # TEMPORARILY DISABLED - No GPS fix indoors
+
+    # odom0: /odometry/gps
+    # odom0_config: [true,  true,  false,   # x, y, z position (GPS provides x, y; z from IMU)
+    #                false, false, false,   # roll, pitch, yaw (from IMU, not GPS)
+    #                false, false, false,   # velocities (not reliable from GPS at low speed)
+    #                false, false, false,   # angular velocities (from IMU)
+    #                false, false, false]   # accelerations (from IMU)
+
+    # odom0_differential: false             # Use absolute GPS position
+    # odom0_relative: false                 # Not relative
+    # odom0_queue_size: 10                  # Queue size
+
+    # -------------------- Process Noise Covariance --------------------
+    # Tune these values based on robot dynamics
+    # Higher values = trust measurements more, lower = trust model more
+
+    process_noise_covariance: [0.05, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.05,   0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.06,   0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.03,   0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.03,   0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.06,   0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.025,   0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.025,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.04,   0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.01,   0.0,    0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.01,   0.0,    0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.01,   0.0,    0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.015,  0.0,    0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.015,  0.0,
+                                0.0,  0.0,    0.0,    0.0,    0.0,    0.0,    0.0,     0.0,     0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.015]
+
+    # -------------------- Initial State Covariance --------------------
+    # Initial uncertainty in state estimate
+
+    initial_estimate_covariance: [1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,
+                                   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9]
+
+
+### navsat_transform_node
+# Converts GPS (lat/lon) to odometry (x/y in meters)
+navsat_transform_node:
+  ros__parameters:
+    # Frequency of transform computation
+    frequency: 10.0
+
+    # Delay for waiting for transforms (seconds)
+    delay: 3.0
+
+    # Magnetic declination (radians). Set to 0.0 if using GPS heading
+    # For your location, you can get this from: https://www.ngdc.noaa.gov/geomag/calculators/magcalc.shtml
+    magnetic_declination_radians: 0.0
+
+    # IMU yaw offset (radians). Compensates for IMU mounting orientation
+    yaw_offset: 0.0
+
+    # If true, publishes the transform from your world_frame to the frame of your GPS
+    broadcast_utm_transform: false
+
+    # If true, will retrieve the transform from the tf tree for datum computation
+    wait_for_datum: false
+
+    # Frames
+    world_frame: odom
+    base_link_frame: base_link
+
+    # Use manual datum (origin point) or compute from first GPS fix
+    use_manual_datum: false
+
+    # If use_manual_datum is true, set these:
+    # datum: [latitude, longitude, altitude]
+    # Example: datum: [55.751244, 37.618423, 0.0]  # Moscow Kremlin

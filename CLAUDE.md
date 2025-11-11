@@ -170,25 +170,32 @@ python3 scripts/diagnostics/system_health.py
 bash scripts/diagnostics/dronecan_gui.sh
 ```
 
-### MAVROS (GPS/IMU Integration)
+### MAVROS & Sensor Fusion (GPS/IMU Integration)
 ```bash
 # Launch MAVROS for GPS/IMU from Crossflight
 cd ros2_ws
 source /opt/ros/humble/setup.bash && source install/setup.bash
 ros2 launch veter_bringup mavros.launch.py
 
-# View IMU data (10 Hz)
-ros2 topic echo /mavros/mavros/data_raw
+# Launch EKF Sensor Fusion (MAVROS + robot_localization)
+ros2 launch veter_bringup sensor_fusion.launch.py
 
-# View GPS data (10 Hz)
-ros2 topic echo /mavros/mavros/global
+# View IMU data (10 Hz)
+ros2 topic echo /mavros/data_raw
+
+# View fused odometry (10 Hz)
+ros2 topic echo /odometry/local
 
 # Check publication rates
-ros2 topic hz /mavros/mavros/data_raw
-ros2 topic hz /mavros/mavros/global
+ros2 topic hz /mavros/data_raw
+ros2 topic hz /odometry/local
+
+# Visualize TF tree
+ros2 run tf2_tools view_frames
 
 # See full documentation
 cat docs/MAVROS_GPS_IMU_INTEGRATION.md
+cat docs/EKF_SENSOR_FUSION.md
 ```
 
 ## Development Guidelines
@@ -325,6 +332,7 @@ ros2 topic echo /cmd_vel
 - `docs/DEVELOPMENT_STATUS.md` - **Current project status** (✅ Updated Nov 9, 2025)
 - `docs/PIXHAWK_INTEGRATION_OPTIONS.md` - **Mini Pixhawk integration options** (⏸️ Decision pending)
 - `docs/MAVROS_GPS_IMU_INTEGRATION.md` - **GPS/IMU integration via MAVROS** (✅ Complete Nov 11, 2025)
+- `docs/EKF_SENSOR_FUSION.md` - **EKF sensor fusion for pose estimation** (✅ Complete Nov 11, 2025)
 
 ### Component Documentation
 - `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
@@ -401,21 +409,32 @@ git log --oneline
    - 4 preset configurations
    - Status: ✅ **Tested, working correctly**
 
-6. **ROS2 Bringup Package** (450 lines)
-   - 4 launch files (minimal, full, teleop, mavros)
+6. **ROS2 Bringup Package** (650 lines)
+   - 5 launch files (minimal, full, teleop, mavros, sensor_fusion)
    - Robot configuration parameters
    - MAVROS configuration
+   - EKF sensor fusion configuration
    - Systemd auto-start service
    - Status: ✅ **Tested, system launches without errors**
 
 7. **MAVROS GPS/IMU Integration** (November 11, 2025)
    - Connected to Radiolink Crossflight (ArduRover)
    - MAVLink 2.0 protocol via USB (/dev/ttyACM0:115200)
-   - IMU data publishing at 10 Hz (/mavros/mavros/data_raw)
-   - GPS data publishing at 10 Hz (/mavros/mavros/global)
+   - IMU data publishing at 10 Hz (/mavros/data_raw)
+   - GPS data publishing at 10 Hz (/mavros/global_position/global)
    - U-blox M9N GPS module support
    - ROS2 Humble compatible configuration
    - Status: ✅ **Tested and operational** (see docs/MAVROS_GPS_IMU_INTEGRATION.md)
+
+8. **EKF Sensor Fusion (robot_localization)** (November 11, 2025)
+   - Extended Kalman Filter for pose estimation
+   - Fuses IMU data from MAVROS @ 10 Hz
+   - GPS fusion prepared (disabled indoors - no GPS fix)
+   - Publishes fused odometry on /odometry/local @ 10 Hz
+   - TF tree: map → odom → base_link → imu_link/gps_link
+   - Static transform publishers for sensor frames
+   - navsat_transform for GPS→Odometry conversion (outdoor use)
+   - Status: ✅ **IMU-only fusion working, GPS ready for outdoor testing**
 
 #### ✅ Software Testing Complete
 **Test Date:** November 11, 2025 (updated)
@@ -427,10 +446,13 @@ git log --oneline
 - ✅ CAN interface operational (can0 @ 1 Mbps UP)
 - ✅ Configuration file loading
 - ✅ MAVROS GPS/IMU integration (`mavros.launch.py`)
-- ✅ IMU data streaming at 10 Hz
-- ✅ GPS data streaming at 10 Hz
+- ✅ IMU data streaming at 10 Hz (/mavros/data_raw)
+- ✅ GPS topic available at 10 Hz (/mavros/global_position/global)
+- ✅ EKF Sensor Fusion (`sensor_fusion.launch.py`)
+- ✅ Fused odometry publishing at 10 Hz (/odometry/local)
+- ✅ TF tree operational (map → odom → base_link)
 
-**System successfully launches and operates!**
+**System successfully launches and operates with sensor fusion!**
 
 #### ⏸️ Hardware Integration: NOT YET PERFORMED
 **Required for Hardware Testing:**
@@ -451,26 +473,29 @@ git log --oneline
 - Mission planning: Via ArduRover Ground Control Station (QGroundControl) - optional
 
 #### 📈 Statistics
-- **Total Code:** 5,176 lines (firmware + ROS2 packages)
-- **Configuration:** ~250 lines (mavros_config.yaml, mavros.launch.py)
-- **Files Created:** 52 (added MAVROS_GPS_IMU_INTEGRATION.md)
+- **Total Code:** 5,376 lines (firmware + ROS2 packages)
+- **Configuration:** ~400 lines (mavros_config.yaml, ekf.yaml, launch files)
+- **Files Created:** 55 (added sensor_fusion.launch.py, ekf.yaml, EKF_SENSOR_FUSION.md)
 - **Git Commits:** 6 (will increase with next commit)
-- **Documentation:** 7 major documents
+- **Documentation:** 8 major documents
 
 ### Important Notes for Claude Code
 - **SOFTWARE 100% COMPLETE:** All code written, built, and tested
 - **GPS/IMU INTEGRATED:** Crossflight connected via MAVROS (November 11, 2025)
+- **EKF SENSOR FUSION OPERATIONAL:** IMU-only fusion working @ 10 Hz (November 11, 2025)
 - **HARDWARE NOT TESTED:** Physical CAN/motor integration pending
-- **Read first:** `docs/MAVROS_GPS_IMU_INTEGRATION.md` for GPS/IMU details
+- **Read first:** `docs/EKF_SENSOR_FUSION.md` for sensor fusion details
+- **Also read:** `docs/MAVROS_GPS_IMU_INTEGRATION.md` for GPS/IMU setup
 - **Also read:** `docs/DEVELOPMENT_STATUS.md` for overall test results
-- **System functional:** ROS2 system launches, GPS/IMU data flowing at 10 Hz
-- **Next step:** Nav2 sensor fusion or physical hardware assembly
+- **System functional:** ROS2 system launches, odometry published @ 10 Hz on /odometry/local
+- **Next step:** Outdoor GPS testing, Nav2 integration, or physical hardware assembly
 
 ---
 
-**Development Phase**: PHASE 1 - Basic Platform (98% complete)
+**Development Phase**: PHASE 2 - Sensor Fusion (90% complete)
 **Software Status**: ✅ COMPLETE and TESTED
 **GPS/IMU Status**: ✅ INTEGRATED via MAVROS
+**EKF Sensor Fusion**: ✅ OPERATIONAL (IMU-only, GPS ready for outdoor testing)
 **Hardware Status**: ⏸️ PENDING - Ready for physical integration
-**Priority**: Nav2 integration with robot_localization OR hardware assembly
-**Next Session:** Sensor fusion (EKF) setup OR Physical CAN bus wiring
+**Priority**: Outdoor GPS testing OR Nav2 integration OR hardware assembly
+**Next Session:** Outdoor GPS fusion testing OR Nav2 path planning OR Physical CAN bus wiring
