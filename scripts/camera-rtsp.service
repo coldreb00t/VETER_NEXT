@@ -1,0 +1,23 @@
+[Unit]
+Description=VETER Camera RTSP Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jetson
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+
+# Start RTSP server for IMX477 camera
+# Streams at 1280x720 @ 30fps for lower bandwidth over internet
+WorkingDirectory=/home/jetson/jetson-robot-project/ros2_ws/src/veter_bringup/scripts
+ExecStart=/usr/bin/python3 camera_rtsp_server.py --width 1280 --height 720 --framerate 30
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

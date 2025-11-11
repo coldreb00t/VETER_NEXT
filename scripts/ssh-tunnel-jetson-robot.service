@@ -10,8 +10,11 @@ Restart=always
 RestartSec=10
 StartLimitInterval=0
 
-# Reverse SSH tunnel: VPS:2223 -> localhost:22
-# This allows accessing Jetson via: ssh -p 2223 jetson@81.200.157.230
+# Reverse SSH tunnel: VPS:2223 -> localhost:22 (SSH access)
+#                      VPS:8554 -> localhost:8554 (RTSP camera stream)
+# This allows:
+#   - Accessing Jetson via: ssh -p 2223 jetson@81.200.157.230
+#   - Viewing camera via: rtsp://81.200.157.230:8554/camera
 ExecStart=/usr/bin/ssh -N \
     -o ServerAliveInterval=30 \
     -o ServerAliveCountMax=3 \
@@ -19,6 +22,7 @@ ExecStart=/usr/bin/ssh -N \
     -o StrictHostKeyChecking=accept-new \
     -i /home/jetson/.ssh/id_ed25519_vps \
     -R 2223:localhost:22 \
+    -R 8554:localhost:8554 \
     root@81.200.157.230
 
 [Install]

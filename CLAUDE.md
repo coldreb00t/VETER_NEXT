@@ -200,7 +200,7 @@ cat docs/EKF_SENSOR_FUSION.md
 
 ### Camera (IMX477 Vision)
 ```bash
-# Launch camera (Sony IMX477 12MP @ 1920x1080)
+# Launch camera for ROS2 (Sony IMX477 12MP @ 1920x1080)
 cd ros2_ws
 source /opt/ros/humble/setup.bash && source install/setup.bash
 ros2 launch veter_bringup camera.launch.py
@@ -218,8 +218,35 @@ ros2 topic hz /camera/image_raw
 rviz2
 # Add: Displays → By topic → /camera/image_raw → Image
 
+# === GLOBAL CAMERA STREAMING (from anywhere in the world) ===
+
+# Check global streaming status
+./scripts/start_camera_global.sh
+
+# View from ANYWHERE (via VPS):
+# rtsp://81.200.157.230:8554/camera
+
+# On remote device (MacBook/PC):
+gst-launch-1.0 rtspsrc location=rtsp://81.200.157.230:8554/camera latency=200 ! \
+  rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink
+
+# OR with VLC:
+vlc rtsp://81.200.157.230:8554/camera
+
+# === LOCAL NETWORK STREAMING (ultra-low latency) ===
+
+# UDP streaming (80-150ms latency, local network only)
+./scripts/start_camera_udp.sh <YOUR_IP>
+
+# View UDP stream on MacBook:
+gst-launch-1.0 udpsrc port=5600 \
+  caps="application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" ! \
+  rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! osxvideosink
+
 # See full documentation
 cat docs/CAMERA_SETUP.md
+cat docs/CAMERA_UDP_STREAMING.md
+cat docs/CAMERA_GLOBAL_STREAMING.md
 ```
 
 ## Development Guidelines
@@ -358,6 +385,8 @@ ros2 topic echo /cmd_vel
 - `docs/MAVROS_GPS_IMU_INTEGRATION.md` - **GPS/IMU integration via MAVROS** (✅ Complete Nov 11, 2025)
 - `docs/EKF_SENSOR_FUSION.md` - **EKF sensor fusion for pose estimation** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_SETUP.md` - **IMX477 camera setup and usage** (✅ Complete Nov 11, 2025)
+- `docs/CAMERA_UDP_STREAMING.md` - **Ultra-low latency local streaming** (✅ Complete Nov 11, 2025)
+- `docs/CAMERA_GLOBAL_STREAMING.md` - **Global access via VPS** (✅ Complete Nov 11, 2025)
 
 ### Component Documentation
 - `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
@@ -460,6 +489,16 @@ git log --oneline
    - Static transform publishers for sensor frames
    - navsat_transform for GPS→Odometry conversion (outdoor use)
    - Status: ✅ **IMU-only fusion working, GPS ready for outdoor testing**
+
+9. **Camera Integration (Sony IMX477)** (November 11, 2025)
+   - Sony IMX477 12MP camera on MIPI CSI CAM0 port
+   - ROS2 gscam integration for computer vision pipeline
+   - Ultra-low latency UDP/RTP streaming (80-150ms glass-to-glass)
+   - H.264 encoding with x264enc (software encoder)
+   - Publishing to /camera/image_raw @ ~15 Hz
+   - RTSP streaming option (200-300ms latency, more reliable)
+   - Scripts: start_camera_udp.sh, enable_max_performance.sh
+   - Status: ✅ **Tested and operational** (see docs/CAMERA_SETUP.md, docs/CAMERA_UDP_STREAMING.md)
 
 #### ✅ Software Testing Complete
 **Test Date:** November 11, 2025 (updated)
