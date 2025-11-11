@@ -208,9 +208,98 @@ ros2 bag play <bag_file>
 - **Latency:** < 100ms (camera to ROS2 topic)
 - **CPU Usage:** ~15-20% (one core)
 
+## Ultra-Low Latency Streaming (80-150ms)
+
+For minimal latency remote viewing, use UDP streaming instead of RTSP:
+
+### 1. Enable Maximum Performance Mode
+
+```bash
+sudo /home/jetson/jetson-robot-project/scripts/enable_max_performance.sh
+```
+
+This reduces latency by ~10-20ms by maximizing CPU/GPU clocks.
+
+### 2. Start UDP Streaming Server
+
+```bash
+cd /home/jetson/jetson-robot-project/ros2_ws/src/veter_bringup/scripts
+python3 camera_udp_server.py --host 192.168.8.7 --port 5000
+```
+
+Options:
+- `--host IP` - Target IP address (use MacBook IP for directed stream)
+- `--port 5000` - UDP port (default: 5000)
+- `--width 1280` - Lower resolution = lower latency
+- `--height 720` - Default 720p
+- `--framerate 30` - FPS (30 or 60)
+
+### 3. View Stream on MacBook
+
+**Option 1: GStreamer (lowest latency ~80-100ms)**
+```bash
+# Install GStreamer on macOS
+brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
+
+# View stream
+gst-launch-1.0 -v udpsrc port=5000 ! \
+  application/x-rtp,encoding-name=H264,payload=96 ! \
+  rtph264depay ! h264parse ! avdec_h264 ! \
+  videoconvert ! autovideosink sync=false async=false
+```
+
+**Option 2: FFplay (good latency ~100-150ms)**
+```bash
+# Install ffmpeg on macOS
+brew install ffmpeg
+
+# View stream
+ffplay -fflags nobuffer -flags low_delay -framedrop \
+  -probesize 32 -analyzeduration 0 \
+  udp://0.0.0.0:5000
+```
+
+**Option 3: VLC (higher latency ~200-300ms, but easiest)**
+```bash
+# Open VLC → Media → Open Network Stream
+# Enter: udp://@:5000
+# Click "Show more options"
+# Set caching to 0ms
+```
+
+### UDP vs RTSP Latency Comparison
+
+| Method | Latency | Setup Complexity | Reliability |
+|--------|---------|------------------|-------------|
+| UDP + GStreamer | 80-100ms | Medium | Good (local network) |
+| UDP + FFplay | 100-150ms | Low | Good (local network) |
+| RTSP + VLC | 200-300ms | Low | Excellent |
+| RTSP + x264enc optimized | 150-250ms | Low | Excellent |
+
+### Key Optimizations Applied
+
+**Encoder Settings (x264enc):**
+- `tune=zerolatency` - Zero latency tuning
+- `speed-preset=ultrafast` - Fastest encoding
+- `bframes=0` - No B-frames (reduce reordering delay)
+- `key-int-max=15` - Frequent keyframes (faster recovery)
+- `rc-lookahead=0` - Disable lookahead buffering
+- `threads=0` - Use all CPU cores
+- `profile=baseline` - Simplest H.264 profile
+
+**Transport Settings:**
+- UDP instead of RTSP (lower protocol overhead)
+- `sync=false async=false` - No buffering
+- `config-interval=1` - Send SPS/PPS with every keyframe
+
+**System Optimization:**
+- Maximum power mode (`nvpmodel -m 0`)
+- Maximum CPU/GPU clocks (`jetson_clocks`)
+- Expected reduction: ~10-20ms
+
 ## Next Steps
 
-1. **Web Streaming:** Add RTSP/WebRTC for remote viewing
+1. **Web Streaming:** Add WebRTC for browser-based viewing
 2. **Computer Vision:** Integrate YOLOv8n for object detection
 3. **Calibration:** Perform camera calibration for accurate measurements
 4. **Compression:** Use image_transport_plugins for bandwidth optimization
