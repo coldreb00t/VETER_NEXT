@@ -243,10 +243,26 @@ gst-launch-1.0 udpsrc port=5600 \
   caps="application/x-rtp, media=(string)video, clock-rate=(int)90000, encoding-name=(string)H264, payload=(int)96" ! \
   rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! osxvideosink
 
+# === SRT STREAMING (ultra-reliable for mobile robots) ===
+
+# Start SRT streaming (best for 4G/5G/Starlink, handles packet loss)
+./scripts/start_camera_srt.sh
+
+# View from ANYWHERE via SRT:
+# srt://81.200.157.230:9001
+
+# On remote device (MacBook/PC):
+./scripts/view_srt_stream.sh
+
+# OR manual GStreamer:
+gst-launch-1.0 srtsrc uri="srt://81.200.157.230:9001" latency=200 mode=caller ! \
+  tsdemux ! h264parse ! avdec_h264 ! videoconvert ! autovideosink
+
 # See full documentation
 cat docs/CAMERA_SETUP.md
 cat docs/CAMERA_UDP_STREAMING.md
 cat docs/CAMERA_GLOBAL_STREAMING.md
+cat docs/CAMERA_SRT_STREAMING.md
 ```
 
 ## Development Guidelines
@@ -386,7 +402,8 @@ ros2 topic echo /cmd_vel
 - `docs/EKF_SENSOR_FUSION.md` - **EKF sensor fusion for pose estimation** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_SETUP.md` - **IMX477 camera setup and usage** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_UDP_STREAMING.md` - **Ultra-low latency local streaming** (✅ Complete Nov 11, 2025)
-- `docs/CAMERA_GLOBAL_STREAMING.md` - **Global access via VPS** (✅ Complete Nov 11, 2025)
+- `docs/CAMERA_GLOBAL_STREAMING.md` - **Global access via VPS (RTSP)** (✅ Complete Nov 11, 2025)
+- `docs/CAMERA_SRT_STREAMING.md` - **Ultra-reliable SRT for mobile robots** (✅ Complete Nov 11, 2025)
 
 ### Component Documentation
 - `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
