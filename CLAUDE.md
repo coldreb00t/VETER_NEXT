@@ -198,6 +198,30 @@ cat docs/MAVROS_GPS_IMU_INTEGRATION.md
 cat docs/EKF_SENSOR_FUSION.md
 ```
 
+### Camera (IMX477 Vision)
+```bash
+# Launch camera (Sony IMX477 12MP @ 1920x1080)
+cd ros2_ws
+source /opt/ros/humble/setup.bash && source install/setup.bash
+ros2 launch veter_bringup camera.launch.py
+
+# View camera topics
+ros2 topic list | grep camera
+# /camera/image_raw
+# /camera/camera_info
+
+# Check frame rate
+ros2 topic hz /camera/image_raw
+# Output: ~15 Hz
+
+# View in RViz2
+rviz2
+# Add: Displays → By topic → /camera/image_raw → Image
+
+# See full documentation
+cat docs/CAMERA_SETUP.md
+```
+
 ## Development Guidelines
 
 ### DroneCAN Message Types
@@ -333,6 +357,7 @@ ros2 topic echo /cmd_vel
 - `docs/PIXHAWK_INTEGRATION_OPTIONS.md` - **Mini Pixhawk integration options** (⏸️ Decision pending)
 - `docs/MAVROS_GPS_IMU_INTEGRATION.md` - **GPS/IMU integration via MAVROS** (✅ Complete Nov 11, 2025)
 - `docs/EKF_SENSOR_FUSION.md` - **EKF sensor fusion for pose estimation** (✅ Complete Nov 11, 2025)
+- `docs/CAMERA_SETUP.md` - **IMX477 camera setup and usage** (✅ Complete Nov 11, 2025)
 
 ### Component Documentation
 - `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
