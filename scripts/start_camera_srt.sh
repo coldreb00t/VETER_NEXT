@@ -51,7 +51,8 @@ gst-launch-1.0 -v \
   "video/x-h264,profile=baseline" ! \
   h264parse ! \
   mpegtsmux ! \
-  srtsink uri="srt://$VPS_HOST:$VPS_PORT" latency=200 mode=caller
+  queue max-size-buffers=0 max-size-time=0 max-size-bytes=0 ! \
+  srtsink uri="srt://$VPS_HOST:$VPS_PORT" latency=500 mode=caller
 
 echo ""
 echo "SRT stream stopped."

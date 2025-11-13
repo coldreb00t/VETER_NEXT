@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 VETER Control - Game Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #main-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* FPV Video Container */
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 75vh;
+            background: #000;
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        #fpv-stream {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* HUD Overlay */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Top Left - Status */
+        #status-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            min-width: 250px;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+
+        #status-panel h3 {
+            margin-bottom: 10px;
+            color: #00ff00;
+            font-size: 18px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .status-line {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .status-value {
+            color: #ffff00;
+            font-weight: bold;
+        }
+
+        /* Top Right - Connection */
+        #connection-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .connection-status {
+            font-size: 16px;
+            margin: 5px 0;
+        }
+
+        .connected {
+            color: #00ff00;
+            animation: pulse 2s infinite;
+        }
+
+        .disconnected {
+            color: #ff0000;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Center - Crosshair (position set dynamically by JS) */
+        #crosshair {
+            position: absolute;
+            /* top and left set by alignCrosshair() */
+            width: 40px;
+            height: 40px;
+            border: 2px solid #00ff00;
+            border-radius: 50%;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: #00ff00;
+        }
+
+        #crosshair::before {
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+
+        #crosshair::after {
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            transform: translateX(-50%);
+        }
+
+        /* Bottom Left - Speed Indicator */
+        #speed-indicator {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 15px;
+            width: 200px;
+        }
+
+        #speed-bar {
+            width: 100%;
+            height: 30px;
+            background: #111;
+            border: 1px solid #00ff00;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #speed-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        /* Control Panel */
+        #control-panel {
+            height: 25vh;
+            background: #1a1a1a;
+            border-top: 3px solid #00ff00;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #controls-help {
+            flex: 1;
+        }
+
+        #controls-help h2 {
+            margin-bottom: 15px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .control-row {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .key {
+            display: inline-block;
+            padding: 3px 8px;
+            background: #333;
+            border: 2px solid #00ff00;
+            border-radius: 3px;
+            margin: 0 3px;
+            font-weight: bold;
+        }
+
+        #mode-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mode-btn {
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            background: #222;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Courier New', monospace;
+            min-width: 200px;
+        }
+
+        .mode-btn:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            transform: scale(1.05);
+        }
+
+        .mode-btn:active {
+            transform: scale(0.95);
+        }
+
+        .mode-btn.danger {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+
+        .mode-btn.danger:hover {
+            background: #ff0000;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+        }
+
+        /* Key press indicators */
+        .key-indicator {
+            position: absolute;
+            padding: 20px;
+            background: rgba(0, 255, 0, 0.3);
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            font-size: 20px;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+
+        .key-indicator.active {
+            opacity: 1;
+        }
+
+        #key-w { top: 100px; left: 50%; transform: translateX(-50%); }
+        #key-a { top: 150px; left: calc(50% - 60px); }
+        #key-s { top: 200px; left: 50%; transform: translateX(-50%); }
+        #key-d { top: 150px; right: calc(50% - 60px); }
+        #key-space { bottom: 100px; left: 50%; transform: translateX(-50%); width: 200px; text-align: center; }
+        #key-shift { bottom: 150px; left: 50%; transform: translateX(-50%); }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <!-- FPV Video Section -->
+        <div id="video-container">
+            <video id="fpv-stream"
+                   autoplay
+                   muted
+                   playsinline
+                   style="width: 100%; height: 100%; object-fit: contain; background: #000;">
+            </video>
+            <div id="video-message" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; text-align: center; pointer-events: none;">
+                Подключение к камере...
+            </div>
+        </div>
+
+            <!-- HUD Overlay -->
+            <div id="hud">
+                <!-- Status Panel -->
+                <div id="status-panel">
+                    <h3>🤖 VETER STATUS</h3>
+                    <div class="status-line">Скорость: <span class="status-value" id="speed-text">0 км/ч</span></div>
+                    <div class="status-line">Батарея: <span class="status-value" id="battery-text">-- В</span></div>
+                    <div class="status-line">Режим: <span class="status-value" id="mode-text">MANUAL</span></div>
+                    <div class="status-line">Канал: <span class="status-value" id="channel-text">4G</span></div>
+                    <div class="status-line">GPS: <span class="status-value" id="gps-text">NO FIX</span></div>
+                </div>
+
+                <!-- Connection Panel -->
+                <div id="connection-panel">
+                    <div class="connection-status" id="ros-status">
+                        <span class="disconnected">⚫ ROS DISCONNECTED</span>
+                    </div>
+                    <div class="connection-status">
+                        WebSocket: <span id="ws-status">--</span>
+                    </div>
+                </div>
+
+                <!-- Crosshair -->
+                <div id="crosshair"></div>
+
+                <!-- Speed Indicator -->
+                <div id="speed-indicator">
+                    <div>SPEED</div>
+                    <div id="speed-bar">
+                        <div id="speed-fill"></div>
+                    </div>
+                </div>
+
+                <!-- Key Press Indicators -->
+                <div class="key-indicator" id="key-w">W ↑</div>
+                <div class="key-indicator" id="key-a">A ←</div>
+                <div class="key-indicator" id="key-s">S ↓</div>
+                <div class="key-indicator" id="key-d">D →</div>
+                <div class="key-indicator" id="key-space">SPACE - STOP</div>
+                <div class="key-indicator" id="key-shift">SHIFT - TURBO</div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div id="control-panel">
+            <div id="controls-help">
+                <h2>🎮 GAME CONTROLS</h2>
+                <div class="control-row">
+                    <span class="key">W</span>
+                    <span class="key">A</span>
+                    <span class="key">S</span>
+                    <span class="key">D</span>
+                    - Движение (вперёд/влево/назад/вправо)
+                </div>
+                <div class="control-row">
+                    <span class="key">SPACE</span> - Экстренный стоп
+                </div>
+                <div class="control-row">
+                    <span class="key">SHIFT</span> - Турбо режим (2x скорость)
+                </div>
+                <div class="control-row">
+                    <span class="key">E</span> - Emergency Stop
+                </div>
+            </div>
+
+            <div id="mode-buttons">
+                <button class="mode-btn" onclick="startPatrol()">🛡️ PATROL MODE</button>
+                <button class="mode-btn" onclick="returnHome()">🏠 RETURN HOME</button>
+                <button class="mode-btn danger" onclick="emergencyStop()">⚠️ E-STOP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+
+    <!-- MediaMTX WebRTC Reader -->
+    <script src="reader.js"></script>
+
+    <script>
+        // ===========================================
+        // ROS Connection
+        // ===========================================
+        let ros = null;
+        let cmdVelTopic = null;
+        let connected = false;
+
+        // WebSocket URL - автоматически определяется по hostname
+        const hostname = window.location.hostname;
+        const WS_URL = `ws://${hostname}:9090`;
+
+        function subscribeToTelemetry() {
+            console.log('📡 Subscribing to telemetry topics...');
+
+            // Subscribe to IMU data
+            const imuTopic = new ROSLIB.Topic({
+                ros: ros,
+                name: '/mavros/imu/data_raw',
+                messageType: 'sensor_msgs/Imu'
+            });
+            imuTopic.subscribe(function(message) {
+                // IMU data received
+                console.log('IMU:', message);
+            });
+
+            // Subscribe to GPS data
+            const gpsTopic = new ROSLIB.Topic({
+                ros: ros,
+                name: '/mavros/global_position/global',
+                messageType: 'sensor_msgs/NavSatFix'
+            });
+            gpsTopic.subscribe(function(message) {
+                if (message.status.status >= 0) {
+                    const lat = message.latitude.toFixed(6);
+                    const lon = message.longitude.toFixed(6);
+                    const alt = message.altitude.toFixed(1);
+                    document.getElementById('gps-text').textContent = `${lat}, ${lon} (${alt}m)`;
+                } else {
+                    document.getElementById('gps-text').textContent = 'NO FIX';
+                }
+            });
+
+            // Subscribe to battery data (if available)
+            const batteryTopic = new ROSLIB.Topic({
+                ros: ros,
+                name: '/mavros/battery',
+                messageType: 'sensor_msgs/BatteryState'
+            });
+            batteryTopic.subscribe(function(message) {
+                const voltage = message.voltage.toFixed(1);
+                const percent = (message.percentage * 100).toFixed(0);
+                document.getElementById('battery-text').textContent = `${voltage}V (${percent}%)`;
+            });
+
+            console.log('✅ Subscribed to telemetry');
+        }
+
+        function connectROS() {
+            ros = new ROSLIB.Ros({
+                url: WS_URL
+            });
+
+            ros.on('connection', function() {
+                console.log('✅ Connected to ROS!');
+                connected = true;
+                document.getElementById('ros-status').innerHTML = '<span class="connected">🟢 ROS CONNECTED</span>';
+                document.getElementById('ws-status').textContent = WS_URL;
+
+                // Create cmd_vel publisher
+                cmdVelTopic = new ROSLIB.Topic({
+                    ros: ros,
+                    name: '/cmd_vel_4g',
+                    messageType: 'geometry_msgs/Twist'
+                });
+
+                // Subscribe to telemetry topics
+                subscribeToTelemetry();
+            });
+
+            ros.on('error', function(error) {
+                console.log('❌ ROS Error:', error);
+                connected = false;
+                document.getElementById('ros-status').innerHTML = '<span class="disconnected">⚫ ROS ERROR</span>';
+            });
+
+            ros.on('close', function() {
+                console.log('🔌 Connection closed');
+                connected = false;
+                document.getElementById('ros-status').innerHTML = '<span class="disconnected">⚫ ROS DISCONNECTED</span>';
+                // Auto-reconnect after 3 seconds
+                setTimeout(connectROS, 3000);
+            });
+        }
+
+        // Connect on page load
+        connectROS();
+
+        // ===========================================
+        // Keyboard Control (Game Style!)
+        // ===========================================
+        const keys = {};
+        let turbo = false;
+        let currentSpeed = 0;
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+
+            // Prevent default for control keys
+            if (['w', 'a', 's', 'd', ' ', 'shift', 'e'].includes(key)) {
+                e.preventDefault();
+            }
+
+            keys[key] = true;
+
+            // Turbo mode
+            if (key === 'shift') {
+                turbo = true;
+                showKeyIndicator('key-shift');
+            }
+
+            // Emergency stop
+            if (key === 'e') {
+                emergencyStop();
+            }
+
+            // Show key indicators
+            if (key === 'w') showKeyIndicator('key-w');
+            if (key === 'a') showKeyIndicator('key-a');
+            if (key === 's') showKeyIndicator('key-s');
+            if (key === 'd') showKeyIndicator('key-d');
+            if (key === ' ') showKeyIndicator('key-space');
+
+            updateMovement();
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            keys[key] = false;
+
+            if (key === 'shift') {
+                turbo = false;
+                hideKeyIndicator('key-shift');
+            }
+
+            // Hide key indicators
+            if (key === 'w') hideKeyIndicator('key-w');
+            if (key === 'a') hideKeyIndicator('key-a');
+            if (key === 's') hideKeyIndicator('key-s');
+            if (key === 'd') hideKeyIndicator('key-d');
+            if (key === ' ') hideKeyIndicator('key-space');
+
+            updateMovement();
+        });
+
+        function showKeyIndicator(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function hideKeyIndicator(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function updateMovement() {
+            if (!connected || !cmdVelTopic) {
+                return;
+            }
+
+            const twist = new ROSLIB.Message({
+                linear: { x: 0.0, y: 0.0, z: 0.0 },
+                angular: { x: 0.0, y: 0.0, z: 0.0 }
+            });
+
+            // Speed multiplier (turbo = 2x)
+            const speedMultiplier = turbo ? 2.0 : 1.0;
+            const maxLinear = 1.0 * speedMultiplier;  // m/s
+            const maxAngular = 0.5 * speedMultiplier; // rad/s
+
+            // W/S - forward/backward
+            if (keys['w']) {
+                twist.linear.x = maxLinear;
+                currentSpeed = maxLinear * 3.6; // convert to km/h
+            }
+            if (keys['s']) {
+                twist.linear.x = -maxLinear * 0.7; // slower reverse
+                currentSpeed = -maxLinear * 0.7 * 3.6;
+            }
+
+            // A/D - turn left/right
+            if (keys['a']) twist.angular.z = maxAngular;
+            if (keys['d']) twist.angular.z = -maxAngular;
+
+            // Space - emergency stop
+            if (keys[' ']) {
+                twist.linear.x = 0.0;
+                twist.angular.z = 0.0;
+                currentSpeed = 0;
+            }
+
+            // If no keys pressed, set speed to 0
+            if (!keys['w'] && !keys['s']) {
+                currentSpeed = 0;
+            }
+
+            // Publish command
+            cmdVelTopic.publish(twist);
+
+            // Update UI
+            updateSpeedIndicator(Math.abs(currentSpeed));
+        }
+
+        function updateSpeedIndicator(speed) {
+            const maxSpeed = 20; // km/h
+            const percentage = (speed / maxSpeed) * 100;
+            document.getElementById('speed-fill').style.width = percentage + '%';
+            document.getElementById('speed-text').textContent = speed.toFixed(1) + ' км/ч';
+        }
+
+        // ===========================================
+        // Mode Control Functions
+        // ===========================================
+        function startPatrol() {
+            alert('🛡️ Patrol mode activated!\n\nРобот начнёт автоматическое патрулирование периметра.');
+            // TODO: Publish to /mode topic or call ROS service
+        }
+
+        function returnHome() {
+            alert('🏠 Returning to home base!\n\nРобот вернётся на базу по GPS координатам.');
+            // TODO: Publish to /navigation/goal topic
+        }
+
+        function emergencyStop() {
+            // Send stop command
+            if (connected && cmdVelTopic) {
+                const stopTwist = new ROSLIB.Message({
+                    linear: { x: 0.0, y: 0.0, z: 0.0 },
+                    angular: { x: 0.0, y: 0.0, z: 0.0 }
+                });
+                cmdVelTopic.publish(stopTwist);
+            }
+
+            currentSpeed = 0;
+            updateSpeedIndicator(0);
+            alert('⚠️ EMERGENCY STOP!\n\nВсе моторы остановлены.');
+        }
+
+        // ===========================================
+        // FPV Video Stream (WebRTC via MediaMTX)
+        // ===========================================
+        const videoElement = document.getElementById('fpv-stream');
+        const videoMessage = document.getElementById('video-message');
+        const crosshair = document.getElementById('crosshair');
+        const WEBRTC_URL = 'http://81.200.157.230:8889/camera/whep';
+
+        console.log('🎬 VIDEO CLIENT v2.5 - DYNAMIC CROSSHAIR ALIGNMENT');
+        console.log('📹 Loading WebRTC stream from MediaMTX...');
+        console.log('📍 URL:', WEBRTC_URL);
+
+        // Align crosshair with actual video content (accounting for letterboxing)
+        function alignCrosshair() {
+            const container = document.getElementById('video-container');
+            const video = videoElement;
+
+            // Get actual video dimensions
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            const containerWidth = container.offsetWidth;
+            const containerHeight = container.offsetHeight;
+
+            if (!videoWidth || !videoHeight) {
+                console.warn('⚠️ Video dimensions not ready, retrying...');
+                setTimeout(alignCrosshair, 200);
+                return;
+            }
+
+            // Calculate aspect ratios
+            const videoRatio = videoWidth / videoHeight;
+            const containerRatio = containerWidth / containerHeight;
+
+            let displayWidth, displayHeight, offsetX, offsetY;
+
+            if (containerRatio > videoRatio) {
+                // Container wider than video (vertical letterboxing)
+                displayHeight = containerHeight;
+                displayWidth = displayHeight * videoRatio;
+                offsetX = (containerWidth - displayWidth) / 2;
+                offsetY = 0;
+            } else {
+                // Container taller than video (horizontal letterboxing)
+                displayWidth = containerWidth;
+                displayHeight = displayWidth / videoRatio;
+                offsetX = 0;
+                offsetY = (containerHeight - displayHeight) / 2;
+            }
+
+            // Position crosshair in center of actual video
+            const centerX = offsetX + displayWidth / 2;
+            const centerY = offsetY + displayHeight / 2;
+
+            crosshair.style.left = centerX + 'px';
+            crosshair.style.top = centerY + 'px';
+            crosshair.style.transform = 'translate(-50%, -50%)';
+
+            console.log('🎯 Crosshair aligned:', {
+                videoSize: `${videoWidth}x${videoHeight}`,
+                displaySize: `${displayWidth.toFixed(0)}x${displayHeight.toFixed(0)}`,
+                position: `${centerX.toFixed(0)}, ${centerY.toFixed(0)}`,
+                offset: `${offsetX.toFixed(0)}, ${offsetY.toFixed(0)}`
+            });
+        }
+
+        // Re-align on window resize
+        window.addEventListener('resize', alignCrosshair);
+
+        const webrtcReader = new MediaMTXWebRTCReader({
+            url: WEBRTC_URL,
+            onError: (error) => {
+                console.error('❌ WebRTC error:', error);
+                videoMessage.textContent = 'Ошибка: ' + error;
+                videoMessage.style.color = '#ff4444';
+            },
+            onTrack: (evt) => {
+                console.log('✅ WebRTC onTrack called');
+                console.log('📹 Stream info:', evt.streams[0]);
+                console.log('📹 Video tracks:', evt.streams[0]?.getVideoTracks());
+
+                // IMPORTANT: onTrack may be called multiple times, ignore if no stream
+                if (!evt.streams || !evt.streams[0]) {
+                    console.warn('⚠️ onTrack called but no stream available, ignoring');
+                    return;
+                }
+
+                videoElement.srcObject = evt.streams[0];
+                videoMessage.style.display = 'none';
+
+                // Force play in case autoplay is blocked
+                videoElement.play().then(() => {
+                    console.log('✅ Video playback started');
+
+                    // Align crosshair with actual video center (accounting for letterboxing)
+                    setTimeout(() => alignCrosshair(), 500);
+                }).catch(err => {
+                    console.error('❌ Video play failed:', err);
+                    videoMessage.textContent = 'Нажмите для воспроизведения';
+                    videoMessage.style.display = 'block';
+                    videoMessage.style.cursor = 'pointer';
+                    videoMessage.onclick = () => {
+                        videoElement.play();
+                        videoMessage.style.display = 'none';
+                    };
+                });
+            }
+        });
+
+        // ===========================================
+        // Telemetry Updates (TODO: Subscribe to ROS topics)
+        // ===========================================
+        setInterval(() => {
+            // TODO: Subscribe to battery, GPS, mode topics
+            // For now, mock data
+            // document.getElementById('battery-text').textContent = '57.6 В';
+            // document.getElementById('gps-text').textContent = 'LAT: 55.12 LON: 37.45';
+        }, 1000);
+
+        // ===========================================
+        // Info on Load
+        // ===========================================
+        console.log('🎮 VETER Game Control Interface');
+        console.log('📡 ROS WebSocket:', WS_URL);
+        console.log('📹 Video: WebRTC via MediaMTX');
+        console.log('');
+        console.log('Controls:');
+        console.log('  W/A/S/D - Movement');
+        console.log('  SPACE - Stop');
+        console.log('  SHIFT - Turbo (2x speed)');
+        console.log('  E - Emergency Stop');
+    </script>
+</body>
+</html>

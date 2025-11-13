@@ -1,0 +1,29 @@
+/**:
+  ros__parameters:
+    # Model configuration
+    model_path: "yolov8n.pt"  # Will download automatically if not present
+    device: "cuda"  # Use GPU on Jetson
+    img_size: 640
+    half_precision: true  # FP16 for faster inference on Jetson
+
+    # Detection thresholds
+    confidence_threshold: 0.5
+    iou_threshold: 0.45
+
+    # Topics
+    input_topic: "/camera/image_raw"
+    output_topic: "/detections"
+    output_image_topic: "/detections/image"
+
+    # Output options
+    publish_annotated: true  # Publish images with bounding boxes
+
+object_tracker:
+  ros__parameters:
+    # Input/Output
+    input_topic: "/detections"
+    output_topic: "/tracked_objects"
+
+    # Tracking parameters
+    iou_threshold: 0.3  # IoU threshold for matching
+    max_age: 10  # Maximum frames without detection before removing track

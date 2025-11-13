@@ -36,7 +36,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Battery**: 18S LiFePO4 (57.6V nominal, 105Ah)
 
 ### Sensors
-- **Camera**: Sony IMX477 12MP (MIPI CSI to Jetson CAM0)
+- **Camera**: Sony IMX477 12MP (MIPI CSI to Jetson CAM0/CAM1, dual overlay)
 - **GPS**: U-blox M9N with compass (on ArduRover)
 - **UWB**: DW3000 for swarm positioning
 - **Ultrasonic**: 4x HC-SR04 (on ESP32 #2)
@@ -220,17 +220,22 @@ rviz2
 
 # === GLOBAL CAMERA STREAMING (from anywhere in the world) ===
 
-# Check global streaming status
-./scripts/start_camera_global.sh
+# MediaMTX streaming (RECOMMENDED - production-ready)
+# Jetson → UDP → VPS → MediaMTX → Clients
+./scripts/start_camera_mediamtx.sh
 
-# View from ANYWHERE (via VPS):
-# rtsp://81.200.157.230:8554/camera
+# View from ANYWHERE:
+# rtsp://81.200.157.230:8555/camera
 
-# On remote device (MacBook/PC):
-gst-launch-1.0 rtspsrc location=rtsp://81.200.157.230:8554/camera latency=200 ! \
+# On remote device (MacBook/PC) - VLC (easiest):
+vlc rtsp://81.200.157.230:8555/camera
+
+# Or GStreamer (auto TCP interleaved mode):
+gst-launch-1.0 -v rtspsrc location=rtsp://81.200.157.230:8555/camera latency=100 ! \
   rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! autovideosink
 
-# OR with VLC:
+# Alternative: Direct RTSP via SSH tunnel
+./scripts/start_camera_global.sh
 vlc rtsp://81.200.157.230:8554/camera
 
 # === LOCAL NETWORK STREAMING (ultra-low latency) ===
@@ -260,6 +265,7 @@ gst-launch-1.0 srtsrc uri="srt://81.200.157.230:9001" latency=200 mode=caller ! 
 
 # See full documentation
 cat docs/CAMERA_SETUP.md
+cat docs/CAMERA_MEDIAMTX_STREAMING.md  # ✅ RECOMMENDED for global access
 cat docs/CAMERA_UDP_STREAMING.md
 cat docs/CAMERA_GLOBAL_STREAMING.md
 cat docs/CAMERA_SRT_STREAMING.md
@@ -401,9 +407,10 @@ ros2 topic echo /cmd_vel
 - `docs/MAVROS_GPS_IMU_INTEGRATION.md` - **GPS/IMU integration via MAVROS** (✅ Complete Nov 11, 2025)
 - `docs/EKF_SENSOR_FUSION.md` - **EKF sensor fusion for pose estimation** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_SETUP.md` - **IMX477 camera setup and usage** (✅ Complete Nov 11, 2025)
+- `docs/CAMERA_MEDIAMTX_STREAMING.md` - **✅ PRODUCTION: Global UDP streaming via MediaMTX** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_UDP_STREAMING.md` - **Ultra-low latency local streaming** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_GLOBAL_STREAMING.md` - **Global access via VPS (RTSP)** (✅ Complete Nov 11, 2025)
-- `docs/CAMERA_SRT_STREAMING.md` - **Ultra-reliable SRT for mobile robots** (✅ Complete Nov 11, 2025)
+- `docs/CAMERA_SRT_STREAMING.md` - **Experimental SRT streaming** (⏸️ On hold)
 
 ### Component Documentation
 - `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
@@ -437,9 +444,9 @@ git log --oneline
 
 ---
 
-## 📊 Current Development Status (November 10, 2025)
+## 📊 Current Development Status (November 13, 2025)
 
-### PHASE 1 Progress: 95% Complete (Software 100%, Hardware 0%)
+### PHASE 1: 100% Complete | PHASE 3: 40-50% Complete
 
 #### ✅ Software Development: COMPLETE
 1. **Infrastructure Setup**
@@ -449,13 +456,14 @@ git log --oneline
    - ROS2 Humble + Navigation2 installed
    - CAN interface configured (can0 @ 1 Mbps)
 
-2. **ESP32 Motor Controller Firmware** (1,077 lines)
+2. **ESP32 Motor Controller Firmware** (13,901 bytes)
    - DroneCAN Node ID: 10
+   - **ESP32 TWAI native CAN controller** (GPIO4/5 @ 1 Mbps)
    - CRSF/ExpressLRS input (420k baud)
    - Differential steering mixing
    - Hardware emergency stop
    - Failsafe modes
-   - Status: ✅ **Tested via USB serial, ready for deployment**
+   - Status: ✅ **HARDWARE TESTED - WORKING WITH VESC** (Nov 10, 2025)
 
 3. **ESP32 Sensor Hub Firmware** (1,618 lines)
    - DroneCAN Node ID: 11
@@ -535,15 +543,27 @@ git log --oneline
 
 **System successfully launches and operates with sensor fusion!**
 
-#### ⏸️ Hardware Integration: NOT YET PERFORMED
-**Required for Hardware Testing:**
-1. Flash ESP32 firmware to production hardware
-2. Physical CAN bus wiring (MCP2515 modules)
-3. Connect VESC motor controllers to CAN
-4. Wire sensors (4× HC-SR04, BME280)
-5. Wire servos, LEDs, E-Stop button
-6. Configure VESC for DroneCAN mode
-7. End-to-end integration testing
+#### 🟡 Phase 3 Hardware Integration: 40-50% COMPLETE
+
+**✅ COMPLETED (November 10, 2025):**
+- ✅ ESP32 Motor Controller flashed to production hardware
+- ✅ **Physical CAN bus communication WORKING** (ESP32 TWAI ↔ VESC)
+- ✅ **67,000+ CAN messages exchanged** in 5-minute test
+- ✅ ONE VESC 75200 connected and tested in UAVCAN mode
+- ✅ **RC control chain verified**: ExpressLRS → ESP32 → VESC
+- ✅ **VESC LED responds to commands** - physical confirmation
+- ✅ **DroneCAN protocol compliant**: ESC RawCommand, NodeStatus, ESC Status
+- ✅ Failsafe logic active and working
+- 📄 **Full report**: `firmware/esp32_motor_controller/TWAI_SUCCESS.md`
+
+**⏸️ NOT YET DONE:**
+- Second VESC integration (only 1 of 2 tested)
+- Actual motor connection (VESC works, motors not connected)
+- 120Ω CAN termination resistor (missing at ESP32 end)
+- ESP32 Sensor Hub physical wiring
+- Jetson CAN interface physical connection
+- Wire sensors (4× HC-SR04, BME280)
+- Wire servos, LEDs, E-Stop button
 
 #### ✅ Mini Pixhawk (Crossflight) Integration: COMPLETE
 **Role:** GPS/IMU provider via MAVROS + Mission planning interface (NOT motor controller)
@@ -561,22 +581,26 @@ git log --oneline
 - **Documentation:** 8 major documents
 
 ### Important Notes for Claude Code
-- **SOFTWARE 100% COMPLETE:** All code written, built, and tested
+- **PHASE 1 SOFTWARE:** ✅ 100% COMPLETE - All code written, built, and tested
+- **PHASE 3 HARDWARE:** 🟡 40-50% COMPLETE - ESP32+VESC integration WORKING!
+- **ESP32 TWAI CAN:** ✅ TESTED - 67,000+ messages with VESC (Nov 10, 2025)
 - **GPS/IMU INTEGRATED:** Crossflight connected via MAVROS (November 11, 2025)
-- **EKF SENSOR FUSION OPERATIONAL:** IMU-only fusion working @ 10 Hz (November 11, 2025)
-- **HARDWARE NOT TESTED:** Physical CAN/motor integration pending
-- **Read first:** `docs/EKF_SENSOR_FUSION.md` for sensor fusion details
+- **EKF SENSOR FUSION:** ✅ OPERATIONAL IMU-only @ 10 Hz (November 11, 2025)
+- **Camera:** ✅ Sony IMX477 streaming @ 15 Hz (November 11-12, 2025)
+- **Web Interface:** ✅ WORKING - FPV stream + telemetry (November 12, 2025)
+- **Read first:** `firmware/esp32_motor_controller/TWAI_SUCCESS.md` for hardware testing report
+- **Also read:** `docs/DEVELOPMENT_STATUS.md` for complete status (updated Nov 13, 2025)
+- **Also read:** `docs/EKF_SENSOR_FUSION.md` for sensor fusion details
 - **Also read:** `docs/MAVROS_GPS_IMU_INTEGRATION.md` for GPS/IMU setup
-- **Also read:** `docs/DEVELOPMENT_STATUS.md` for overall test results
-- **System functional:** ROS2 system launches, odometry published @ 10 Hz on /odometry/local
-- **Next step:** Outdoor GPS testing, Nav2 integration, or physical hardware assembly
 
 ---
 
-**Development Phase**: PHASE 2 - Sensor Fusion (90% complete)
-**Software Status**: ✅ COMPLETE and TESTED
+**Development Phase**: PHASE 3 - Hardware Integration (40-50% complete)
+**Software Status**: ✅ 100% COMPLETE and TESTED
+**Hardware Status**: 🟡 40-50% COMPLETE - ESP32+VESC working, motors pending
 **GPS/IMU Status**: ✅ INTEGRATED via MAVROS
-**EKF Sensor Fusion**: ✅ OPERATIONAL (IMU-only, GPS ready for outdoor testing)
-**Hardware Status**: ⏸️ PENDING - Ready for physical integration
-**Priority**: Outdoor GPS testing OR Nav2 integration OR hardware assembly
-**Next Session:** Outdoor GPS fusion testing OR Nav2 path planning OR Physical CAN bus wiring
+**EKF Sensor Fusion**: ✅ OPERATIONAL (IMU-only, GPS ready)
+**Camera**: ✅ OPERATIONAL (Sony IMX477 @ 15 Hz)
+**Web UI**: ✅ WORKING (FPV + telemetry)
+**Priority**: Complete Phase 3 - Second VESC, motors, Jetson CAN integration
+**Next Session:** Add second VESC, connect motors, OR connect Jetson to CAN bus

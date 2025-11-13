@@ -32,7 +32,7 @@ fi
 
 # Start SRT viewer
 gst-launch-1.0 -v \
-  srtsrc uri="srt://$VPS_HOST:$VPS_PORT" latency=200 mode=caller ! \
+  srtsrc uri="srt://$VPS_HOST:$VPS_PORT" latency=500 mode=caller ! \
   tsdemux ! \
   h264parse ! \
   avdec_h264 ! \

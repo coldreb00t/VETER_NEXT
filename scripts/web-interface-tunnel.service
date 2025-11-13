@@ -1,0 +1,19 @@
+[Unit]
+Description=Web Interface Reverse SSH Tunnel to VPS
+After=network-online.target ssh.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jetson
+ExecStart=/home/jetson/jetson-robot-project/scripts/setup-web-interface-tunnel.sh
+Restart=always
+RestartSec=10
+StartLimitInterval=0
+
+# Keep-alive settings
+Environment="AUTOSSH_GATETIME=0"
+Environment="AUTOSSH_PORT=0"
+
+[Install]
+WantedBy=multi-user.target
