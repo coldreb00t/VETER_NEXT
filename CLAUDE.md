@@ -402,7 +402,7 @@ ros2 topic echo /cmd_vel
 - `docs/README.md` - Main project documentation
 - `docs/CAN_SETUP.md` - CAN bus configuration guide (✅ Complete)
 - `docs/INSTALLATION.md` - Software installation guide (✅ Complete)
-- `docs/DEVELOPMENT_STATUS.md` - **Current project status** (✅ Updated Nov 9, 2025)
+- `docs/DEVELOPMENT_STATUS.md` - **Current project status** (✅ Updated Nov 14, 2025)
 - `docs/PIXHAWK_INTEGRATION_OPTIONS.md` - **Mini Pixhawk integration options** (⏸️ Decision pending)
 - `docs/MAVROS_GPS_IMU_INTEGRATION.md` - **GPS/IMU integration via MAVROS** (✅ Complete Nov 11, 2025)
 - `docs/EKF_SENSOR_FUSION.md` - **EKF sensor fusion for pose estimation** (✅ Complete Nov 11, 2025)
@@ -411,8 +411,12 @@ ros2 topic echo /cmd_vel
 - `docs/CAMERA_UDP_STREAMING.md` - **Ultra-low latency local streaming** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_GLOBAL_STREAMING.md` - **Global access via VPS (RTSP)** (✅ Complete Nov 11, 2025)
 - `docs/CAMERA_SRT_STREAMING.md` - **Experimental SRT streaming** (⏸️ On hold)
+- `docs/DUAL_CAMERA_SYSTEM.md` - **✅ Dual camera system architecture** (✅ Complete Nov 13, 2025)
+- `docs/FIRE_SUPPRESSION_SYSTEM.md` - **✅ Fire suppression with stepper motors** (✅ Complete Nov 13, 2025)
+- `docs/JETSON_CAN_INTEGRATION.md` - **✅ Jetson → VESC CAN integration + bug fixes** (✅ Complete Nov 14, 2025)
 
 ### Component Documentation
+- `firmware/esp32_motor_controller/TWAI_SUCCESS.md` - ESP32 → VESC CAN integration report (✅ Complete Nov 10, 2025)
 - `firmware/esp32_motor_controller/README.md` - Motor controller firmware (✅ Complete)
 - `firmware/esp32_sensor_hub/README.md` - Sensor hub firmware (✅ Complete)
 - `ros2_ws/src/veter_dronecan_bridge/README.md` - DroneCAN bridge package (✅ Complete)
@@ -421,6 +425,9 @@ ros2 topic echo /cmd_vel
 - `docs/FAILSAFE_LOGIC.md` - Failsafe system documentation
 - `docs/SECURITY_MODE.md` - Security patrol mode guide
 - `docs/VOICE_CONTROL.md` - Voice control setup
+- `ros2_ws/src/veter_camera_manager/` - Camera Mode Manager package (pending)
+- `ros2_ws/src/veter_fire_suppression/` - Fire Suppression package (pending)
+- `firmware/esp32_fire_controller/` - Fire controller firmware (pending)
 
 ## Git Workflow
 
@@ -574,33 +581,38 @@ git log --oneline
 - Mission planning: Via ArduRover Ground Control Station (QGroundControl) - optional
 
 #### 📈 Statistics
-- **Total Code:** 5,376 lines (firmware + ROS2 packages)
+- **Total Code:** 5,376 lines (firmware + ROS2 packages) + bug fixes in dronecan_bridge
 - **Configuration:** ~400 lines (mavros_config.yaml, ekf.yaml, launch files)
-- **Files Created:** 55 (added sensor_fusion.launch.py, ekf.yaml, EKF_SENSOR_FUSION.md)
-- **Git Commits:** 6 (will increase with next commit)
-- **Documentation:** 8 major documents
+- **Files Created:** 58 (added JETSON_CAN_INTEGRATION.md)
+- **Git Commits:** 6 (will increase with next commit including bug fixes)
+- **Documentation:** 27 total documents (11 major design docs)
+- **Hardware Milestones:** 2 (ESP32→VESC Nov 10, Jetson→VESC Nov 14)
 
 ### Important Notes for Claude Code
 - **PHASE 1 SOFTWARE:** ✅ 100% COMPLETE - All code written, built, and tested
-- **PHASE 3 HARDWARE:** 🟡 40-50% COMPLETE - ESP32+VESC integration WORKING!
+- **PHASE 3 HARDWARE:** 🟡 **60-70% COMPLETE** - ESP32+VESC+Jetson integration WORKING!
 - **ESP32 TWAI CAN:** ✅ TESTED - 67,000+ messages with VESC (Nov 10, 2025)
+- **JETSON CAN:** ✅ **NEW** - 126,000+ messages with VESC, 3 bugs fixed (Nov 14, 2025)
+- **ROS2 → VESC:** ✅ WORKING - Motor control via /cmd_vel @ 100 Hz
 - **GPS/IMU INTEGRATED:** Crossflight connected via MAVROS (November 11, 2025)
 - **EKF SENSOR FUSION:** ✅ OPERATIONAL IMU-only @ 10 Hz (November 11, 2025)
 - **Camera:** ✅ Sony IMX477 streaming @ 15 Hz (November 11-12, 2025)
 - **Web Interface:** ✅ WORKING - FPV stream + telemetry (November 12, 2025)
-- **Read first:** `firmware/esp32_motor_controller/TWAI_SUCCESS.md` for hardware testing report
-- **Also read:** `docs/DEVELOPMENT_STATUS.md` for complete status (updated Nov 13, 2025)
+- **Read first:** `docs/JETSON_CAN_INTEGRATION.md` for latest hardware milestone (Nov 14, 2025)
+- **Also read:** `firmware/esp32_motor_controller/TWAI_SUCCESS.md` for ESP32 testing report
+- **Also read:** `docs/DEVELOPMENT_STATUS.md` for complete status (updated Nov 14, 2025)
 - **Also read:** `docs/EKF_SENSOR_FUSION.md` for sensor fusion details
 - **Also read:** `docs/MAVROS_GPS_IMU_INTEGRATION.md` for GPS/IMU setup
 
 ---
 
-**Development Phase**: PHASE 3 - Hardware Integration (40-50% complete)
+**Development Phase**: PHASE 3 - Hardware Integration (60-70% complete)
 **Software Status**: ✅ 100% COMPLETE and TESTED
-**Hardware Status**: 🟡 40-50% COMPLETE - ESP32+VESC working, motors pending
+**Hardware Status**: 🟡 **60-70% COMPLETE** - ESP32+VESC+Jetson CAN working! (+20% Nov 14)
+**Jetson CAN**: ✅ **NEW** - J17 soldered, ROS2→VESC working, 3 bugs fixed
 **GPS/IMU Status**: ✅ INTEGRATED via MAVROS
 **EKF Sensor Fusion**: ✅ OPERATIONAL (IMU-only, GPS ready)
 **Camera**: ✅ OPERATIONAL (Sony IMX477 @ 15 Hz)
 **Web UI**: ✅ WORKING (FPV + telemetry)
-**Priority**: Complete Phase 3 - Second VESC, motors, Jetson CAN integration
-**Next Session:** Add second VESC, connect motors, OR connect Jetson to CAN bus
+**Priority**: Connect ESP32 to CAN bus → test tri-node (Jetson ↔ ESP32 ↔ VESC)
+**Next Session:** Connect ESP32 to CAN, test 3-way communication, OR implement VESC telemetry decoder

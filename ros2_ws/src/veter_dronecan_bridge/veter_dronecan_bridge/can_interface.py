@@ -77,7 +77,7 @@ class CANInterface:
             msg = can.Message(
                 arbitration_id=can_id,
                 data=data,
-                is_extended_id=False
+                is_extended_id=True  # DroneCAN uses 29-bit extended IDs
             )
             self.bus.send(msg)
             return True
@@ -159,31 +159,50 @@ class DroneCAN:
     @staticmethod
     def extract_message_info(can_id: int) -> Tuple[int, int]:
         """
-        Extract message type and source node ID from CAN ID
+        Extract message type and source node ID from DroneCAN CAN ID
+
+        DroneCAN CAN ID format (29 bits):
+        [28:24] Priority (5 bits)
+        [23:8]  Message Type ID (16 bits)
+        [7:1]   Source Node ID (7 bits)
+        [0]     Service/Message flag
 
         Args:
-            can_id: CAN identifier
+            can_id: 29-bit CAN identifier
 
         Returns:
             tuple: (message_type, source_node_id)
         """
-        msg_type = can_id & 0xFFFFFF80  # Remove node ID bits
-        node_id = can_id & 0x7F  # Extract node ID (bits 0-6)
+        priority = (can_id >> 24) & 0x1F
+        msg_type = (can_id >> 8) & 0xFFFF
+        node_id = (can_id >> 1) & 0x7F
         return msg_type, node_id
 
     @staticmethod
-    def build_can_id(msg_type: int, node_id: int) -> int:
+    def build_can_id(msg_type: int, node_id: int, priority: int = 8) -> int:
         """
-        Build CAN ID from message type and node ID
+        Build DroneCAN CAN ID (29-bit extended identifier)
+
+        DroneCAN CAN ID format (29 bits):
+        [28:24] Priority (5 bits) - 0=highest, 31=lowest
+        [23:8]  Message Type ID (16 bits)
+        [7:1]   Source Node ID (7 bits)
+        [0]     Service/Message flag (0 = message broadcast)
 
         Args:
-            msg_type: DroneCAN message type
+            msg_type: DroneCAN message type (16-bit)
             node_id: Source node ID (0-127)
+            priority: Message priority (0-31, default 8=HIGH)
 
         Returns:
-            int: Complete CAN identifier
+            int: Complete 29-bit CAN identifier
         """
-        return (msg_type & 0xFFFFFF80) | (node_id & 0x7F)
+        can_id = 0
+        can_id |= (priority & 0x1F) << 24           # Priority [28:24]
+        can_id |= (msg_type & 0xFFFF) << 8          # Message Type [23:8]
+        can_id |= (node_id & 0x7F) << 1             # Source Node [7:1]
+        can_id |= 0                                  # Message broadcast [0]
+        return can_id
 
     @staticmethod
     def parse_heartbeat(data: bytes) -> dict:
@@ -288,10 +307,18 @@ class DroneCAN:
             'severity': severity  # 0=info, 1=warning, 2=critical
         }
 
+    # Transfer ID counter for ESC commands (0-31)
+    _esc_transfer_id = 0
+
     @staticmethod
     def build_esc_command(node_id: int, left_cmd: int, right_cmd: int) -> Tuple[int, bytes]:
         """
         Build ESC RawCommand message
+
+        DroneCAN ESC RawCommand payload format:
+        [0-1] Left motor command (int16_t, little-endian, -8191 to 8191)
+        [2-3] Right motor command (int16_t, little-endian, -8191 to 8191)
+        [4]   Tail byte (transfer ID)
 
         Args:
             node_id: Source node ID
@@ -303,12 +330,22 @@ class DroneCAN:
         """
         can_id = DroneCAN.build_can_id(DroneCAN.MSG_TYPE_ESC_COMMAND, node_id)
 
-        # Pack two 14-bit values
-        data = bytearray(4)
-        data[0] = left_cmd & 0xFF
-        data[1] = (left_cmd >> 8) & 0x3F
-        data[2] = right_cmd & 0xFF
-        data[3] = (right_cmd >> 8) & 0x3F
+        # Clamp to valid range
+        left_cmd = max(min(left_cmd, 8191), -8191)
+        right_cmd = max(min(right_cmd, 8191), -8191)
+
+        # Pack as signed int16_t little-endian (2 bytes per motor)
+        motor_data = struct.pack('<hh', left_cmd, right_cmd)
+
+        # Build full payload: motor commands + tail byte
+        data = bytearray(motor_data)
+
+        # Tail byte: Start(1) | End(1) | Toggle(0) | TransferID(5 bits)
+        tail = 0xC0 | (DroneCAN._esc_transfer_id & 0x1F)
+        data.append(tail)
+
+        # Increment transfer ID (0-31 wrap)
+        DroneCAN._esc_transfer_id = (DroneCAN._esc_transfer_id + 1) & 0x1F
 
         return can_id, bytes(data)
 

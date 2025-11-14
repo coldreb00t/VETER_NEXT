@@ -113,9 +113,13 @@ class DroneCANBridgeNode(Node):
         self.servo_tilt = 90
         self.led_mode = 1  # AUTO
         self.led_brightness = 128
+        self.last_left_cmd = 0   # Last motor command (for periodic sending)
+        self.last_right_cmd = 0
 
         # Timers
         self.create_timer(1.0 / publish_rate, self.timer_callback)
+        # Motor command timer (100 Hz for VESC watchdog)
+        self.create_timer(0.01, self.motor_command_timer)
 
         self.get_logger().info('DroneCAN Bridge initialized successfully')
 
@@ -280,6 +284,19 @@ class DroneCANBridgeNode(Node):
             right_cmd
         )
 
+        self.can.send_frame(can_id, data)
+
+        # Store last command for periodic sending
+        self.last_left_cmd = left_cmd
+        self.last_right_cmd = right_cmd
+
+    def motor_command_timer(self):
+        """Send motor commands at 100 Hz (VESC watchdog requirement)"""
+        can_id, data = DroneCAN.build_esc_command(
+            self.jetson_node_id,
+            self.last_left_cmd,
+            self.last_right_cmd
+        )
         self.can.send_frame(can_id, data)
 
     def servo_pan_callback(self, msg: Int32):
