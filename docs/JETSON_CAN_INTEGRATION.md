@@ -237,6 +237,32 @@ ros2 topic hz /vesc2/voltage
 - **VESC offset correction**: +2 byte offset from standard UAVCAN format
 - **Separate topics**: `/vesc1/*` and `/vesc2/*` prevent data mixing
 
+### 6. Active CAN Nodes Verified ✅ (November 14, 2025)
+
+All 4 DroneCAN nodes confirmed present on CAN bus via `candump can0`:
+
+| Node | CAN ID | Type | Status |
+|------|--------|------|--------|
+| **VESC1** | `0x18040A01` | Left Motor Controller (ESC Index 0) | ✅ Active @ 50 Hz |
+| **VESC2** | `0x18040A02` | Right Motor Controller (ESC Index 1) | ✅ Active @ 50 Hz |
+| **ESP32** | `0x08040614` | Motor Controller (Node 10) | ✅ Active (NodeStatus) |
+| **Jetson** | `0x08040628` | ROS2 Bridge (Node 20) | ✅ Active @ 100 Hz |
+
+**CAN Bus Topology**: VESC1 (120Ω) → Jetson → ESP32 → VESC2 (120Ω)
+
+```bash
+# Verify all nodes present
+timeout 3 candump can0 | tee /tmp/can_check.txt
+
+# Expected traffic:
+# - 08040614: ESP32 NodeStatus heartbeats
+# - 08040628: Jetson ESC RawCommand @ 100 Hz
+# - 18040A01: VESC1 ESC Status (multi-frame) @ 50 Hz
+# - 18040A02: VESC2 ESC Status (multi-frame) @ 50 Hz
+```
+
+**Note**: ESP32 Sensor Hub (Node 11) not yet physically connected.
+
 ## Bug Fixes Applied
 
 ### Bug #1: Incorrect CAN ID Encoding

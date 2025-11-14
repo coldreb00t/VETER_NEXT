@@ -504,14 +504,16 @@ VESC 75200 (UAVCAN mode, Node ID 0)
 - ⏸️ **Long-term reliability** - Only 5-minute test completed, need >1 hour sustained operation
 
 **Additional Components (Stage 3):**
+- ✅ **ESP32 Motor Controller** - Connected to CAN bus (Node 10), verified present (November 14, 2025)
 - ⏸️ ESP32 Sensor Hub not physically connected to CAN bus
 - ✅ **Jetson CAN interface working** - Soldered to J17, tested with BOTH VESCs (November 14, 2025)
 - ✅ **ROS2 DroneCAN Bridge → VESC** - Working with dual VESCs, 3 bugs fixed (November 14, 2025)
-- ⏸️ ROS2 DroneCAN Bridge → ESP32 communication not tested (next step)
+- ✅ **ROS2 DroneCAN Bridge → ESP32 Motor Controller** - Communication verified on CAN bus (November 14, 2025)
+- ⏸️ ROS2 DroneCAN Bridge → ESP32 Sensor Hub - Not yet connected (next step)
 - ⏸️ Real sensor data flow (ultrasonic, BME280)
 - ⏸️ Camera servo control via DroneCAN
 - ⏸️ LED lighting control via DroneCAN
-- ⏸️ **VESC telemetry decoder** - Receiving ESC Status from BOTH VESCs @ 50 Hz, but multi-frame reassembly not implemented
+- ✅ **VESC telemetry decoder** - Multi-frame reassembly IMPLEMENTED, dual VESCs @ 102 Hz (November 14, 2025)
 - ✅ Mini Pixhawk GPS/IMU integration via MAVROS (completed November 11, 2025)
 - ✅ EKF sensor fusion (completed November 11, 2025)
 
