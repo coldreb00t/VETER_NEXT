@@ -1,14 +1,16 @@
 # Jetson CAN Integration - Successful Implementation
 
 **Date**: November 14, 2025
-**Status**: ✅ **WORKING** - Jetson → VESC communication verified
-**Hardware**: Jetson Orin Nano + Waveshare SN65HVD230 + VESC 75200
+**Status**: ✅ **WORKING** - Jetson → VESC dual motor control verified
+**Hardware**: Jetson Orin Nano + Waveshare SN65HVD230 + 2× VESC 75200
 
 ---
 
 ## Overview
 
-Successfully integrated Jetson Orin Nano with VESC motor controller via CAN bus using native hardware CAN interface and ROS2 DroneCAN Bridge. This enables full ROS2 → VESC motor control for the VETER robot platform.
+Successfully integrated Jetson Orin Nano with dual VESC motor controllers via CAN bus using native hardware CAN interface (J17 header). Both left and right motor VESCs confirmed working with independent control verified. This enables full ROS2 → VESC differential drive motor control for the VETER robot platform.
+
+**Critical Discovery**: VESCs require commands at **100 Hz frequency** - lower frequencies are ignored!
 
 ## Hardware Configuration
 
@@ -16,8 +18,11 @@ Successfully integrated Jetson Orin Nano with VESC motor controller via CAN bus 
 
 - **Main Computer**: NVIDIA Jetson Orin Nano Super Developer Kit
 - **CAN Transceiver**: Waveshare SN65HVD230 (3.3V, 1 Mbps capable)
-- **Motor Controller**: VESC 75200 (UAVCAN mode, Node ID 0)
+- **Motor Controllers**:
+  - VESC1 (Flipsky 75200): Controller ID=1, ESC Index=0 (left motor)
+  - VESC2 (Flipsky 75200): Controller ID=2, ESC Index=1 (right motor)
 - **Wiring**: Soldered directly to J17 pads on Jetson
+- **CAN Bus Topology**: VESC1 (120Ω) → Jetson → ESP32 → VESC2 (120Ω)
 
 ### Pin Configuration
 
@@ -104,20 +109,44 @@ candump can0 | grep "18040A01"
 
 ### 2. Manual CAN Commands → VESC
 
+**CRITICAL REQUIREMENT**: Commands MUST be sent at **100 Hz** (10ms interval). Slower rates are IGNORED!
+
 Successfully sent motor commands from Jetson using raw cansend:
 
 ```bash
-# Send heartbeat (Node ID 10, pretending to be ESP32)
-cansend can0 18015514#64000000000000C0
+# ❌ WRONG: Single command or slow rate (5 Hz)
+cansend can0 08040628#10271027C0
+# Result: VESC ignores command
 
-# Send STOP command
-cansend can0 08040614#00000000C0
-# VESC LED responded! ✅
+# ✅ CORRECT: High-frequency command stream (100 Hz)
+for i in {1..200}; do
+  cansend can0 08040628#10271027C0  # Forward both motors (10000)
+  sleep 0.01  # 10ms = 100 Hz
+done
+# Result: VESC1 LED blinks! VESC2 Current graph responds! ✅
 
-# Send FORWARD command (value=1000)
-cansend can0 08040614#E803E803C1
-# VESC LED brightness changed! ✅
+# Test VESC1 only (ESC Index 0)
+for i in {1..200}; do
+  cansend can0 08040628#10270000C0  # Left motor only
+  sleep 0.01
+done
+
+# Test VESC2 only (ESC Index 1)
+for i in {1..200}; do
+  cansend can0 08040628#00001027C1  # Right motor only
+  sleep 0.01
+done
+
+# Stop both motors
+for i in {1..100}; do
+  cansend can0 08040628#00000000C2  # Stop
+  sleep 0.01
+done
 ```
+
+**Verification Methods**:
+- VESC1: Watch LED for blinking (works great!)
+- VESC2: Connect via USB to VESC Tool → Real-time Data → Monitor Current/Duty graphs
 
 **CAN ID Format** (29-bit extended):
 ```
@@ -369,24 +398,25 @@ can0  18040A01   [3]  01 80 56
 
 ## Current Limitations
 
-1. **VESC Telemetry Decoder**: Not yet implemented
-   - Receiving data successfully (~124K packets)
-   - Multi-frame reassembly needed
-   - Byte format requires reverse-engineering or VESC source code analysis
+1. **VESC Telemetry Decoder**: Not yet implemented for BOTH VESCs
+   - ✅ Receiving data from VESC1 (Node 0/1, ID 0x18040A01)
+   - ✅ Receiving data from VESC2 (Node 1/9, ID 0x18040A02)
+   - ❌ Multi-frame reassembly needed for both
+   - ❌ Byte format requires reverse-engineering or VESC source code analysis
+   - **Critical**: Need to parse voltage, current, RPM, temperature from BOTH motors
 
-2. **Missing Termination Resistor**:
-   - 120Ω resistor needed at Jetson end
-   - Causes occasional Bus-off events (auto-recovers)
-   - Not critical for current testing
+2. **Termination Resistors**: Properly configured
+   - ✅ VESC1 has 120Ω terminator (bus start)
+   - ✅ VESC2 has 120Ω terminator (bus end)
+   - ✅ Jetson/Waveshare: no terminator (mid-bus)
+   - ✅ ESP32: no terminator (mid-bus)
+   - Total impedance: 60Ω (correct!)
 
-3. **Single VESC**:
-   - Only left motor VESC connected (Node ID 0)
-   - Right motor VESC integration pending
-
-4. **No Motor Load Testing**:
-   - Motors not physically connected to VESC
-   - Only LED indication verified
+3. **No Motor Load Testing**:
+   - Motors not physically connected to VESCs
+   - Only LED + VESC Tool indication verified
    - Actual rotation testing pending
+   - **Ready for motor connection!**
 
 ## Next Steps
 

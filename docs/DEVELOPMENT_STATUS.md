@@ -2,7 +2,7 @@
 
 **Last Updated:** November 14, 2025
 **Session Date:** November 14, 2025
-**Status:** PHASE 1 complete (100%), PHASE 3 in progress (60-70% complete - Jetson CAN ✅)
+**Status:** PHASE 1 complete (100%), PHASE 3 in progress (70-80% complete - Dual VESC ✅)
 
 ---
 
@@ -362,9 +362,9 @@ Loop #58 | E-Stop: ACTIVE | RC: OK | Ch1: 992 Ch2: 992
 - ESP32 Sensor Hub not physically wired to CAN bus
 - Only software testing performed at this stage
 
-### 🟡 Phase 3 Hardware Integration: 60-70% COMPLETE
+### 🟡 Phase 3 Hardware Integration: 70-80% COMPLETE
 
-**Status:** ESP32 + VESC + **Jetson CAN** integration **SUCCESSFULLY TESTED** (November 14, 2025)
+**Status:** ESP32 + **DUAL VESC** + **Jetson CAN** integration **SUCCESSFULLY TESTED** (November 14, 2025)
 
 📄 **Detailed Reports:**
 - `firmware/esp32_motor_controller/TWAI_SUCCESS.md` - ESP32 → VESC (November 10)
@@ -456,9 +456,12 @@ VESC 75200 (UAVCAN mode)
   1. CAN ID encoding (priority + message type + node ID bit shifting)
   2. Extended ID flag (is_extended_id=True for 29-bit IDs)
   3. ESC command payload (int16_t + tail byte + transfer ID)
-- ✅ **ROS2 → VESC control verified** - VESC LED responds to `/cmd_vel` commands
+- ✅ **ROS2 → VESC control verified** - BOTH VESCs respond to `/cmd_vel` commands
+- ✅ **VESC1 (ESC Index 0)**: LED blinks in response to motor commands
+- ✅ **VESC2 (ESC Index 1)**: Current/Duty Cycle graphs respond (verified in VESC Tool)
 - ✅ **Periodic command transmission** @ 100 Hz (VESC watchdog requirement)
 - ✅ **Bidirectional communication** - TX: 2,192 packets, RX: 124,017 packets
+- ✅ **Dual VESC telemetry reception** - Receiving ESC Status from BOTH motors @ 50 Hz
 - ✅ **Zero errors** - 100% success rate after bug fixes
 
 **Verified Control Chain:**
@@ -491,24 +494,24 @@ VESC 75200 (UAVCAN mode, Node ID 0)
 - **ROS2 → VESC Latency**: ~15-20 ms (end-to-end control loop)
 - **Success Rate**: 100% (0 transmission errors)
 
-#### ⏸️ Hardware Testing NOT Done (30-40% Remaining)
+#### ⏸️ Hardware Testing NOT Done (20-30% Remaining)
 
 **Critical Path (Stage 2):**
-- ⏸️ **Second VESC integration** - Only ONE VESC tested (left motor, ESC Index 0)
-- ⏸️ **Actual motor connection** - VESC receives commands but motors NOT physically connected
+- ✅ **Second VESC integration** - BOTH VESCs tested and verified (November 14, 2025)
+- ⏸️ **Actual motor connection** - VESCs receive commands but motors NOT physically connected
 - ⚠️ **CAN termination resistor** - Missing 120Ω at ESP32 end (causes occasional Bus-off, auto-recovers in 100ms)
 - ⏸️ **E-Stop physical button** - Logic working but temporarily disabled in code for testing
 - ⏸️ **Long-term reliability** - Only 5-minute test completed, need >1 hour sustained operation
 
 **Additional Components (Stage 3):**
 - ⏸️ ESP32 Sensor Hub not physically connected to CAN bus
-- ✅ **Jetson CAN interface working** - Soldered to J17, tested with VESC (November 14, 2025)
-- ✅ **ROS2 DroneCAN Bridge → VESC** - Working, 3 bugs fixed (November 14, 2025)
+- ✅ **Jetson CAN interface working** - Soldered to J17, tested with BOTH VESCs (November 14, 2025)
+- ✅ **ROS2 DroneCAN Bridge → VESC** - Working with dual VESCs, 3 bugs fixed (November 14, 2025)
 - ⏸️ ROS2 DroneCAN Bridge → ESP32 communication not tested (next step)
 - ⏸️ Real sensor data flow (ultrasonic, BME280)
 - ⏸️ Camera servo control via DroneCAN
 - ⏸️ LED lighting control via DroneCAN
-- ⏸️ **VESC telemetry decoder** - Receiving data but parser not implemented
+- ⏸️ **VESC telemetry decoder** - Receiving ESC Status from BOTH VESCs @ 50 Hz, but multi-frame reassembly not implemented
 - ✅ Mini Pixhawk GPS/IMU integration via MAVROS (completed November 11, 2025)
 - ✅ EKF sensor fusion (completed November 11, 2025)
 
@@ -530,15 +533,22 @@ VESC 75200 (UAVCAN mode, Node ID 0)
 
 **Software Status:** ✅ 100% COMPLETE - All code written, tested, and functional
 
-**Hardware Status:** 🟡 **60-70% COMPLETE** (+20% progress November 14, 2025)
+**Hardware Status:** 🟡 **70-80% COMPLETE** (+25% progress November 14, 2025)
 
 **Phase 3 Stages:**
 - ✅ **Stage 1**: ESP32 Motor Controller + ONE VESC integration (DONE - Nov 10, 2025)
-- ⏸️ **Stage 2**: Second VESC + motors + CAN termination (Next - 50% ready)
-- 🟡 **Stage 3**: Jetson CAN integration (**60% DONE** - Nov 14, 2025)
+- ✅ **Stage 2**: Second VESC testing (DONE - Nov 14, 2025)
+  - ✅ VESC1 (ESC Index 0) responding to commands
+  - ✅ VESC2 (ESC Index 1) responding to commands
+  - ✅ Dual VESC telemetry reception confirmed
+  - ⏸️ Actual motors not connected yet
+  - ⏸️ CAN termination resistors pending
+- 🟡 **Stage 3**: Jetson CAN integration (**80% DONE** - Nov 14, 2025)
   - ✅ J17 hardware soldering complete
   - ✅ ROS2 DroneCAN Bridge bug fixes (3 critical bugs)
-  - ✅ Jetson → VESC control verified
+  - ✅ Jetson → BOTH VESCs control verified
+  - ✅ Dual VESC telemetry reception working
+  - ⏸️ Telemetry decoder implementation pending
   - ⏸️ Jetson ↔ ESP32 communication pending
   - ⏸️ Sensor Hub integration pending
 - ⏸️ **Stage 4**: Full system end-to-end testing (Pending)
@@ -546,16 +556,17 @@ VESC 75200 (UAVCAN mode, Node ID 0)
 **Next Hardware Steps:**
 1. **✅ DONE**: Jetson CAN hardware integration (J17 + SN65HVD230)
 2. **✅ DONE**: ROS2 DroneCAN Bridge bug fixes (3 critical bugs)
-3. **✅ DONE**: Jetson → VESC control verification
-4. **NEXT**: Connect ESP32 to CAN bus → test Jetson ↔ ESP32 ↔ VESC tri-node communication
-5. **NEXT**: Implement VESC telemetry decoder (multi-frame reassembly)
-6. Add 120Ω CAN termination resistor at ESP32 end (and optionally at Jetson end)
-7. Connect second VESC 75200 (ID 2, ESC Index 1)
-8. Connect actual motors to both VESCs
-9. Re-enable E-Stop button in code
-10. Test physical motor rotation with ROS2 commands
-11. Long-term reliability testing (>1 hour)
-12. Full autonomous navigation test with Nav2
+3. **✅ DONE**: Jetson → VESC1 control verification
+4. **✅ DONE**: Second VESC 75200 configuration and testing (ID 2, ESC Index 1)
+5. **✅ DONE**: Jetson → VESC2 control verification via VESC Tool
+6. **NEXT**: Implement VESC telemetry decoder for BOTH VESCs (multi-frame reassembly)
+7. **NEXT**: Connect ESP32 to CAN bus → test Jetson ↔ ESP32 ↔ VESC tri-node communication
+8. Add 120Ω CAN termination resistor at ESP32 end (and optionally at Jetson end)
+9. Connect actual motors to both VESCs
+10. Re-enable E-Stop button in code
+11. Test physical motor rotation with ROS2 commands
+12. Long-term reliability testing (>1 hour)
+13. Full autonomous navigation test with Nav2
 
 ---
 
