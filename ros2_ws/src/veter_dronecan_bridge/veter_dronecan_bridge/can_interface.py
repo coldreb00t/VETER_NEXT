@@ -7,8 +7,75 @@ Provides methods to send and receive CAN frames for DroneCAN protocol.
 
 import can
 import struct
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 import threading
+from collections import defaultdict
+import numpy as np
+
+
+class MultiFrameReassembler:
+    """Reassembles DroneCAN multi-frame transfers"""
+
+    def __init__(self):
+        """Initialize reassembler with empty frame buffers"""
+        # Dictionary: {(can_id, transfer_id): [frames]}
+        self.frame_buffers: Dict[Tuple[int, int], list] = defaultdict(list)
+        self.completed_messages = []
+
+    def add_frame(self, can_id: int, data: bytes) -> Optional[bytes]:
+        """
+        Add a frame to the reassembly buffer
+
+        Args:
+            can_id: CAN identifier
+            data: Frame data including tail byte
+
+        Returns:
+            Complete payload if transfer is complete, None otherwise
+        """
+        if len(data) == 0:
+            return None
+
+        # Extract tail byte
+        tail_byte = data[-1]
+        frame_data = data[:-1]  # Remove tail byte
+
+        # Decode tail byte (DroneCAN format)
+        # [7] = start of transfer
+        # [6] = end of transfer
+        # [5] = toggle bit
+        # [4:0] = transfer ID
+        start_of_transfer = (tail_byte & 0x80) != 0
+        end_of_transfer = (tail_byte & 0x40) != 0
+        toggle_bit = (tail_byte & 0x20) != 0
+        transfer_id = tail_byte & 0x1F
+
+        key = (can_id, transfer_id)
+
+        # Single-frame transfer
+        if start_of_transfer and end_of_transfer:
+            return bytes(frame_data)
+
+        # Multi-frame transfer
+        if start_of_transfer:
+            # Start new transfer
+            self.frame_buffers[key] = [frame_data]
+        else:
+            # Continue existing transfer
+            if key in self.frame_buffers:
+                self.frame_buffers[key].append(frame_data)
+            else:
+                # Missing start frame, discard
+                return None
+
+        # Check if transfer is complete
+        if end_of_transfer and key in self.frame_buffers:
+            # Combine all frames
+            complete_payload = b''.join(self.frame_buffers[key])
+            del self.frame_buffers[key]  # Clean up
+            return bytes(complete_payload)
+
+        return None
 
 
 class CANInterface:
@@ -150,6 +217,7 @@ class DroneCAN:
     # DroneCAN message type IDs
     MSG_TYPE_HEARTBEAT = 0x155  # NodeStatus (341)
     MSG_TYPE_ESC_COMMAND = 0x406  # ESC RawCommand (1030)
+    MSG_TYPE_ESC_STATUS = 0x40A  # ESC Status (1034) - VESC telemetry
     MSG_TYPE_RANGE_SENSOR = 0x41A  # RangeSensor (1050)
     MSG_TYPE_AIR_DATA = 0x424  # AirData (1060)
     MSG_TYPE_COLLISION_WARNING = 0x42E  # CollisionWarning (1070)
@@ -305,6 +373,66 @@ class DroneCAN:
             'direction': direction_names[direction] if direction < 4 else 'unknown',
             'distance_cm': dist_mm / 10.0,
             'severity': severity  # 0=info, 1=warning, 2=critical
+        }
+
+    @staticmethod
+    def parse_esc_status(data: bytes) -> dict:
+        """
+        Parse VESC ESC Status message (Type 1034)
+
+        NOTE: VESC uses a 2-byte offset from standard UAVCAN ESC Status format!
+
+        VESC ESC Status payload format (13+ bytes):
+        [0-3]   error_count (uint32, little-endian)
+        [4-5]   ??? (unknown field, possibly flags or reserved)
+        [6-7]   voltage (float16, volts) - OFFSET +2 from standard
+        [8-9]   current (float16, amperes) - OFFSET +2 from standard
+        [10-11] temperature (float16, kelvin) - OFFSET +2 from standard
+        [12+]   additional fields (TBD)
+
+        Standard UAVCAN spec has voltage at [4-5], but VESC puts it at [6-7].
+
+        Args:
+            data: CAN frame data bytes (13+ bytes after multi-frame reassembly)
+
+        Returns:
+            dict: Parsed ESC status with voltage, current, RPM, temperature, etc.
+        """
+        if len(data) < 13:
+            return None
+
+        # Extract error_count (uint32, little-endian)
+        error_count = struct.unpack('<I', data[0:4])[0]
+
+        # Extract float16 fields with VESC's 2-byte offset
+        # Bytes 4-5: Unknown field (skip for now)
+        unknown_field = struct.unpack('<H', data[4:6])[0]
+
+        # Bytes 6-7: Voltage (float16) - confirmed from captured data
+        voltage_raw = struct.unpack('<H', data[6:8])[0]
+        voltage = float(np.frombuffer(struct.pack('<H', voltage_raw), dtype=np.float16)[0])
+
+        # Bytes 8-9: Current (float16) - likely, needs motor movement test to confirm
+        current_raw = struct.unpack('<H', data[8:10])[0]
+        current = float(np.frombuffer(struct.pack('<H', current_raw), dtype=np.float16)[0])
+
+        # Bytes 10-11: Temperature (float16) - tentative, needs confirmation
+        temp_raw = struct.unpack('<H', data[10:12])[0]
+        temperature_k = float(np.frombuffer(struct.pack('<H', temp_raw), dtype=np.float16)[0])
+
+        # Bytes 12+: Additional fields (RPM, power rating, etc.) - TBD
+        # Need more data with motor movement to identify these
+
+        return {
+            'error_count': error_count,
+            'unknown_field': unknown_field,  # Bytes 4-5
+            'voltage': voltage,  # Volts (VERIFIED: 45.6-45.8V on 48V battery)
+            'current': current,  # Amperes (TENTATIVE: ~0.76-1.76A observed)
+            'temperature_k': temperature_k,  # Kelvin (TENTATIVE)
+            'temperature_c': temperature_k - 273.15 if temperature_k > 0 else None,  # Celsius
+            'rpm': None,  # Not yet decoded
+            'power_rating_pct': None,  # Not yet decoded
+            'esc_index': None  # Not yet decoded
         }
 
     # Transfer ID counter for ESC commands (0-31)

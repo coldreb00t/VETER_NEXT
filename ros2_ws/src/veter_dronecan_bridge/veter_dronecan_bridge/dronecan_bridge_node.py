@@ -13,7 +13,7 @@ from std_msgs.msg import String, Float32, Int32
 from sensor_msgs.msg import Range, Temperature, RelativeHumidity, FluidPressure
 from geometry_msgs.msg import Twist
 
-from .can_interface import CANInterface, DroneCAN
+from .can_interface import CANInterface, DroneCAN, MultiFrameReassembler
 
 
 class DroneCANBridgeNode(Node):
@@ -72,6 +72,18 @@ class DroneCANBridgeNode(Node):
         self.pub_motor_status = self.create_publisher(String, '/motor_controller/status', 10)
         self.pub_sensor_status = self.create_publisher(String, '/sensor_hub/status', 10)
 
+        # VESC1 telemetry publishers (ESC Status messages, Node ID 0)
+        self.pub_vesc1_voltage = self.create_publisher(Float32, '/vesc1/voltage', sensor_qos)
+        self.pub_vesc1_current = self.create_publisher(Float32, '/vesc1/current', sensor_qos)
+        self.pub_vesc1_temperature = self.create_publisher(Temperature, '/vesc1/temperature', sensor_qos)
+        self.pub_vesc1_status = self.create_publisher(String, '/vesc1/status', 10)
+
+        # VESC2 telemetry publishers (ESC Status messages, Node ID 1)
+        self.pub_vesc2_voltage = self.create_publisher(Float32, '/vesc2/voltage', sensor_qos)
+        self.pub_vesc2_current = self.create_publisher(Float32, '/vesc2/current', sensor_qos)
+        self.pub_vesc2_temperature = self.create_publisher(Temperature, '/vesc2/temperature', sensor_qos)
+        self.pub_vesc2_status = self.create_publisher(String, '/vesc2/status', 10)
+
         # Subscribers (ROS2 -> CAN)
         self.sub_cmd_vel = self.create_subscription(
             Twist,
@@ -116,6 +128,9 @@ class DroneCANBridgeNode(Node):
         self.last_left_cmd = 0   # Last motor command (for periodic sending)
         self.last_right_cmd = 0
 
+        # Multi-frame reassembler for VESC telemetry
+        self.vesc_reassembler = MultiFrameReassembler()
+
         # Timers
         self.create_timer(1.0 / publish_rate, self.timer_callback)
         # Motor command timer (100 Hz for VESC watchdog)
@@ -136,6 +151,9 @@ class DroneCANBridgeNode(Node):
         # Parse and publish based on message type
         if msg_type == DroneCAN.MSG_TYPE_HEARTBEAT:
             self.handle_heartbeat(node_id, msg.data)
+
+        elif msg_type == DroneCAN.MSG_TYPE_ESC_STATUS:
+            self.handle_esc_status(node_id, msg.arbitration_id, msg.data)
 
         elif msg_type == DroneCAN.MSG_TYPE_RANGE_SENSOR:
             self.handle_range_sensor(node_id, msg.data)
@@ -244,6 +262,74 @@ class DroneCANBridgeNode(Node):
         # Log critical warnings
         if warning['severity'] == 2:
             self.get_logger().warn(f"COLLISION CRITICAL: {msg.data}")
+
+    def handle_esc_status(self, node_id: int, can_id: int, data: bytes):
+        """Handle VESC ESC Status message (multi-frame telemetry)"""
+        # Add frame to reassembler
+        complete_payload = self.vesc_reassembler.add_frame(can_id, data)
+
+        if complete_payload is None:
+            # Transfer not yet complete
+            return
+
+        # Parse ESC status from complete payload
+        esc_status = DroneCAN.parse_esc_status(complete_payload)
+        if not esc_status:
+            return
+
+        timestamp = self.get_clock().now().to_msg()
+
+        # Determine which VESC based on node_id
+        # VESC1 (left motor):  Node ID = 0, ESC Index = 0
+        # VESC2 (right motor): Node ID = 1, ESC Index = 1
+        if node_id == 0:
+            # VESC1 telemetry
+            voltage_pub = self.pub_vesc1_voltage
+            current_pub = self.pub_vesc1_current
+            temperature_pub = self.pub_vesc1_temperature
+            status_pub = self.pub_vesc1_status
+            frame_id = 'vesc1'
+        elif node_id == 1:
+            # VESC2 telemetry
+            voltage_pub = self.pub_vesc2_voltage
+            current_pub = self.pub_vesc2_current
+            temperature_pub = self.pub_vesc2_temperature
+            status_pub = self.pub_vesc2_status
+            frame_id = 'vesc2'
+        else:
+            # Unknown VESC node ID
+            self.get_logger().warn(f"Unknown VESC node_id: {node_id}")
+            return
+
+        # Publish voltage
+        voltage_msg = Float32()
+        voltage_msg.data = esc_status['voltage']
+        voltage_pub.publish(voltage_msg)
+
+        # Publish current
+        current_msg = Float32()
+        current_msg.data = esc_status['current']
+        current_pub.publish(current_msg)
+
+        # Publish temperature
+        if esc_status['temperature_c'] is not None and esc_status['temperature_c'] > -200:
+            temp_msg = Temperature()
+            temp_msg.header.stamp = timestamp
+            temp_msg.header.frame_id = frame_id
+            temp_msg.temperature = esc_status['temperature_c']
+            temp_msg.variance = 1.0  # Typical variance
+            temperature_pub.publish(temp_msg)
+
+        # Publish status summary
+        status_msg = String()
+        status_msg.data = (
+            f"Node={node_id} "
+            f"V={esc_status['voltage']:.1f}V "
+            f"I={esc_status['current']:.2f}A "
+            f"T={esc_status['temperature_c']:.0f}°C " if esc_status['temperature_c'] else "T=N/A "
+            f"errors={esc_status['error_count']}"
+        )
+        status_pub.publish(status_msg)
 
     def cmd_vel_callback(self, msg: Twist):
         """
