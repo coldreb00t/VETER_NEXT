@@ -524,8 +524,10 @@ class TelemetryWidget(QWidget):
         # Telemetry text area (larger now without ping duplication)
         self.telemetry_text = QTextEdit()
         self.telemetry_text.setReadOnly(True)
-        self.telemetry_text.setMinimumHeight(180)
-        self.telemetry_text.setStyleSheet("font-family: monospace; font-size: 12px;")
+        self.telemetry_text.setFixedHeight(200)
+        self.telemetry_text.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.telemetry_text.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.telemetry_text.setStyleSheet("font-family: monospace; font-size: 11px; padding: 5px;")
         self.telemetry_text.setPlainText("Waiting for telemetry data...")
 
         telemetry_layout.addWidget(self.telemetry_text)
