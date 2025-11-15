@@ -7,14 +7,66 @@ Simple, fast GUI for robot control and video streaming
 import sys
 import json
 import socket
+import subprocess
+import re
+import threading
+import time
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDialog, QGridLayout, QSlider,
     QGroupBox, QTextEdit
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QThread
 from PyQt6.QtGui import QKeyEvent, QPainter, QPen, QColor
 import vlc
+
+
+class PingThread(QThread):
+    """Thread for periodically pinging the robot"""
+
+    ping_result = pyqtSignal(float)  # Emits latency in ms, or -1 if failed
+
+    def __init__(self, host):
+        super().__init__()
+        self.host = host
+        self.running = True
+
+    def run(self):
+        """Ping the robot every 2 seconds"""
+        while self.running:
+            try:
+                # Run ping command (macOS: ping -c 1 -W 1000)
+                # -c 1: send 1 packet
+                # -W 1000: timeout 1000ms
+                result = subprocess.run(
+                    ['ping', '-c', '1', '-W', '1000', self.host],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+
+                if result.returncode == 0:
+                    # Parse output for latency
+                    # Example: "time=23.456 ms"
+                    match = re.search(r'time=([0-9.]+)\s*ms', result.stdout)
+                    if match:
+                        latency = float(match.group(1))
+                        self.ping_result.emit(latency)
+                    else:
+                        self.ping_result.emit(-1)
+                else:
+                    # Ping failed
+                    self.ping_result.emit(-1)
+
+            except (subprocess.TimeoutExpired, Exception):
+                self.ping_result.emit(-1)
+
+            # Wait 2 seconds before next ping
+            time.sleep(2)
+
+    def stop(self):
+        """Stop the ping thread"""
+        self.running = False
 
 
 class RobotConnection:
@@ -309,9 +361,15 @@ class TelemetryWidget(QWidget):
         telemetry_group = QGroupBox("Robot Telemetry")
         telemetry_layout = QVBoxLayout()
 
+        # Ping/latency label with color coding
+        self.ping_label = QLabel("Ping: --")
+        self.ping_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
+        telemetry_layout.addWidget(self.ping_label)
+
+        # Telemetry text area
         self.telemetry_text = QTextEdit()
         self.telemetry_text.setReadOnly(True)
-        self.telemetry_text.setMaximumHeight(150)
+        self.telemetry_text.setMaximumHeight(120)
         self.telemetry_text.setPlainText("UDP Control Active\n\nLightweight protocol\nNo installation required\nLow latency")
 
         telemetry_layout.addWidget(self.telemetry_text)
@@ -319,6 +377,66 @@ class TelemetryWidget(QWidget):
         layout.addWidget(telemetry_group)
 
         self.setLayout(layout)
+
+        # Stats
+        self.packets_sent = 0
+        self.last_latency = -1
+
+    def update_ping(self, latency):
+        """Update ping display with color coding"""
+        self.last_latency = latency
+
+        if latency < 0:
+            # Ping failed
+            self.ping_label.setText("Ping: TIMEOUT")
+            self.ping_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; padding: 5px; "
+                "background-color: red; color: white;"
+            )
+        elif latency < 50:
+            # Excellent (<50ms)
+            self.ping_label.setText(f"Ping: {latency:.1f} ms")
+            self.ping_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; padding: 5px; "
+                "background-color: green; color: white;"
+            )
+        elif latency < 150:
+            # Good (50-150ms)
+            self.ping_label.setText(f"Ping: {latency:.1f} ms")
+            self.ping_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; padding: 5px; "
+                "background-color: orange; color: white;"
+            )
+        else:
+            # Poor (>150ms)
+            self.ping_label.setText(f"Ping: {latency:.1f} ms")
+            self.ping_label.setStyleSheet(
+                "font-size: 14px; font-weight: bold; padding: 5px; "
+                "background-color: red; color: white;"
+            )
+
+    def update_stats(self, packets_sent):
+        """Update statistics"""
+        self.packets_sent = packets_sent
+
+        # Update telemetry text
+        text = "Connection Status:\n"
+        text += f"Protocol: UDP\n"
+        text += f"Packets Sent: {self.packets_sent}\n"
+
+        if self.last_latency >= 0:
+            text += f"Latency: {self.last_latency:.1f} ms\n"
+
+            if self.last_latency < 50:
+                text += "Quality: Excellent"
+            elif self.last_latency < 150:
+                text += "Quality: Good"
+            else:
+                text += "Quality: Poor"
+        else:
+            text += "Latency: No connection"
+
+        self.telemetry_text.setPlainText(text)
 
     def update_telemetry(self, data):
         """Update telemetry display"""
@@ -391,6 +509,17 @@ class MainWindow(QMainWindow):
 
         self.current_linear = 0.0
         self.current_angular = 0.0
+        self.packets_sent = 0
+
+        # Start ping thread
+        self.ping_thread = PingThread(self.connection_info['host'])
+        self.ping_thread.ping_result.connect(self.on_ping_result)
+        self.ping_thread.start()
+
+        # Timer for updating stats
+        self.stats_timer = QTimer()
+        self.stats_timer.timeout.connect(self.update_stats)
+        self.stats_timer.start(1000)  # Update stats every second
 
     def connect_to_robot(self):
         """Connect to robot via UDP"""
@@ -409,7 +538,17 @@ class MainWindow(QMainWindow):
     def send_velocity(self):
         """Send velocity command to robot"""
         if self.robot.connected:
-            self.robot.send_velocity(self.current_linear, self.current_angular)
+            success = self.robot.send_velocity(self.current_linear, self.current_angular)
+            if success:
+                self.packets_sent += 1
+
+    def on_ping_result(self, latency):
+        """Handle ping result from ping thread"""
+        self.telemetry_widget.update_ping(latency)
+
+    def update_stats(self):
+        """Update statistics display"""
+        self.telemetry_widget.update_stats(self.packets_sent)
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle keyboard control"""
@@ -438,8 +577,14 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Cleanup on close"""
         self.velocity_timer.stop()
+        self.stats_timer.stop()
         self.video_widget.stop_stream()
         self.robot.disconnect()
+
+        # Stop ping thread
+        self.ping_thread.stop()
+        self.ping_thread.wait()  # Wait for thread to finish
+
         event.accept()
 
 
