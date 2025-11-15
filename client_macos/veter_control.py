@@ -519,69 +519,80 @@ class TelemetryWidget(QWidget):
         layout = QVBoxLayout()
 
         telemetry_group = QGroupBox("Robot Telemetry")
-        telemetry_layout = QVBoxLayout()
+        telemetry_layout = QGridLayout()
+        telemetry_layout.setSpacing(5)
 
-        # Telemetry text area (larger now without ping duplication)
-        self.telemetry_text = QTextEdit()
-        self.telemetry_text.setReadOnly(True)
-        self.telemetry_text.setFixedHeight(200)
-        self.telemetry_text.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.telemetry_text.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.telemetry_text.setStyleSheet("font-family: monospace; font-size: 11px; padding: 5px;")
-        self.telemetry_text.setPlainText("Waiting for telemetry data...")
+        # Battery section
+        battery_header = QLabel("🔋 Battery")
+        battery_header.setStyleSheet("font-weight: bold; font-size: 12px;")
+        telemetry_layout.addWidget(battery_header, 0, 0, 1, 2)
 
-        telemetry_layout.addWidget(self.telemetry_text)
+        self.battery_voltage_label = QLabel("Voltage: -- V")
+        self.battery_percent_label = QLabel("Charge: --%")
+        telemetry_layout.addWidget(self.battery_voltage_label, 1, 0)
+        telemetry_layout.addWidget(self.battery_percent_label, 1, 1)
+
+        # GPS section
+        gps_header = QLabel("📍 GPS")
+        gps_header.setStyleSheet("font-weight: bold; font-size: 12px;")
+        telemetry_layout.addWidget(gps_header, 2, 0, 1, 2)
+
+        self.gps_lat_label = QLabel("Lat: --")
+        self.gps_lon_label = QLabel("Lon: --")
+        telemetry_layout.addWidget(self.gps_lat_label, 3, 0)
+        telemetry_layout.addWidget(self.gps_lon_label, 3, 1)
+
+        # Speed section
+        speed_header = QLabel("🏃 Speed")
+        speed_header.setStyleSheet("font-weight: bold; font-size: 12px;")
+        telemetry_layout.addWidget(speed_header, 4, 0, 1, 2)
+
+        self.speed_label = QLabel("-- m/s")
+        telemetry_layout.addWidget(self.speed_label, 5, 0, 1, 2)
+
+        # Motor currents section
+        current_header = QLabel("⚡ Motors")
+        current_header.setStyleSheet("font-weight: bold; font-size: 12px;")
+        telemetry_layout.addWidget(current_header, 6, 0, 1, 2)
+
+        self.current_left_label = QLabel("L: -- A")
+        self.current_right_label = QLabel("R: -- A")
+        telemetry_layout.addWidget(self.current_left_label, 7, 0)
+        telemetry_layout.addWidget(self.current_right_label, 7, 1)
+
         telemetry_group.setLayout(telemetry_layout)
         layout.addWidget(telemetry_group)
+        layout.addStretch()
 
         self.setLayout(layout)
 
-        # Telemetry data
-        self.battery_voltage = 0.0
-        self.battery_percent = 0
-        self.latitude = 0.0
-        self.longitude = 0.0
-        self.speed = 0.0
-        self.current_left = 0.0
-        self.current_right = 0.0
-
     def update_telemetry(self, data):
         """Update telemetry display from robot data"""
-        # Update internal data
-        self.battery_voltage = data.get('battery_voltage', 0.0)
-        self.battery_percent = data.get('battery_percent', 0)
-        self.latitude = data.get('latitude', 0.0)
-        self.longitude = data.get('longitude', 0.0)
-        self.speed = data.get('speed', 0.0)
-        self.current_left = data.get('current_left', 0.0)
-        self.current_right = data.get('current_right', 0.0)
+        # Battery
+        voltage = data.get('battery_voltage', 0.0)
+        percent = data.get('battery_percent', 0)
+        self.battery_voltage_label.setText(f"Voltage: {voltage:.1f} V")
+        self.battery_percent_label.setText(f"Charge: {percent}%")
 
-        # Format display text
-        text = "═══ ROBOT TELEMETRY ═══\n\n"
-
-        # Battery status
-        text += f"🔋 Battery:\n"
-        text += f"   Voltage: {self.battery_voltage:.1f} V\n"
-        text += f"   Charge:  {self.battery_percent}%\n\n"
-
-        # GPS position
-        text += f"📍 GPS Position:\n"
-        if self.latitude != 0.0 or self.longitude != 0.0:
-            text += f"   Lat:  {self.latitude:.6f}°\n"
-            text += f"   Lon:  {self.longitude:.6f}°\n\n"
+        # GPS
+        lat = data.get('latitude', 0.0)
+        lon = data.get('longitude', 0.0)
+        if lat != 0.0 or lon != 0.0:
+            self.gps_lat_label.setText(f"Lat: {lat:.6f}°")
+            self.gps_lon_label.setText(f"Lon: {lon:.6f}°")
         else:
-            text += f"   No GPS fix\n\n"
+            self.gps_lat_label.setText("No GPS fix")
+            self.gps_lon_label.setText("")
 
         # Speed
-        text += f"🏃 Speed:\n"
-        text += f"   {self.speed:.2f} m/s\n\n"
+        speed = data.get('speed', 0.0)
+        self.speed_label.setText(f"{speed:.2f} m/s")
 
         # Motor currents
-        text += f"⚡ Motor Current:\n"
-        text += f"   Left:  {self.current_left:.1f} A\n"
-        text += f"   Right: {self.current_right:.1f} A\n"
-
-        self.telemetry_text.setPlainText(text)
+        current_left = data.get('current_left', 0.0)
+        current_right = data.get('current_right', 0.0)
+        self.current_left_label.setText(f"L: {current_left:.1f} A")
+        self.current_right_label.setText(f"R: {current_right:.1f} A")
 
 
 class MainWindow(QMainWindow):
