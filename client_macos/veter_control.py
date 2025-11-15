@@ -164,30 +164,46 @@ class ConnectDialog(QDialog):
         }
 
 
-class CrosshairOverlay(QWidget):
-    """Transparent overlay widget for drawing crosshair"""
+class HUDOverlay(QWidget):
+    """Transparent overlay widget for drawing HUD (crosshair + ping)"""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+
+        # HUD data
+        self.ping_ms = -1
+        self.packets_sent = 0
+
+    def set_ping(self, ping_ms):
+        """Update ping value"""
+        self.ping_ms = ping_ms
+        self.update()
+
+    def set_packets(self, packets):
+        """Update packets sent"""
+        self.packets_sent = packets
+        self.update()
 
     def paintEvent(self, event):
-        """Draw crosshair overlay"""
+        """Draw HUD overlay: crosshair + ping info"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
 
         # Get center of widget
         center_x = self.width() // 2
         center_y = self.height() // 2
 
-        # Crosshair settings
+        # === DRAW CROSSHAIR ===
         crosshair_size = 20
         crosshair_gap = 5
         crosshair_thickness = 2
 
         # Set pen (green with transparency)
-        pen = QPen(QColor(0, 255, 0, 200))  # Green with alpha
+        pen = QPen(QColor(0, 255, 0, 200))
         pen.setWidth(crosshair_thickness)
         painter.setPen(pen)
 
@@ -216,9 +232,47 @@ class CrosshairOverlay(QWidget):
         painter.setPen(pen)
         painter.drawPoint(center_x, center_y)
 
+        # === DRAW PING INFO (top-left corner) ===
+        from PyQt6.QtGui import QFont, QBrush
+
+        # Determine color based on ping
+        if self.ping_ms < 0:
+            bg_color = QColor(200, 0, 0, 180)  # Red with alpha
+            text = "TIMEOUT"
+        elif self.ping_ms < 50:
+            bg_color = QColor(0, 180, 0, 180)  # Green
+            text = f"{self.ping_ms:.0f} ms"
+        elif self.ping_ms < 150:
+            bg_color = QColor(255, 165, 0, 180)  # Orange
+            text = f"{self.ping_ms:.0f} ms"
+        else:
+            bg_color = QColor(200, 0, 0, 180)  # Red
+            text = f"{self.ping_ms:.0f} ms"
+
+        # Draw ping background box
+        box_x = 10
+        box_y = 10
+        box_width = 120
+        box_height = 60
+
+        painter.setBrush(QBrush(bg_color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(box_x, box_y, box_width, box_height, 5, 5)
+
+        # Draw ping text
+        painter.setPen(QColor(255, 255, 255))  # White text
+        font = QFont("Arial", 14, QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.drawText(box_x + 10, box_y + 25, text)
+
+        # Draw packets sent (smaller text)
+        font_small = QFont("Arial", 10)
+        painter.setFont(font_small)
+        painter.drawText(box_x + 10, box_y + 45, f"PKT: {self.packets_sent}")
+
 
 class VideoWidget(QWidget):
-    """VLC-based video streaming widget with crosshair overlay"""
+    """VLC-based video streaming widget with HUD overlay"""
 
     def __init__(self, rtsp_url):
         super().__init__()
@@ -232,8 +286,9 @@ class VideoWidget(QWidget):
         self.video_frame = QWidget()
         self.video_frame.setMinimumSize(640, 480)
 
-        # Create crosshair overlay
-        self.crosshair = CrosshairOverlay(self.video_frame)
+        # Create HUD overlay (crosshair + ping)
+        self.hud = HUDOverlay(self.video_frame)
+        self.hud.setGeometry(0, 0, 640, 480)
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -244,7 +299,7 @@ class VideoWidget(QWidget):
         if sys.platform.startswith('darwin'):  # macOS
             self.player.set_nsobject(int(self.video_frame.winId()))
 
-        # Timer to trigger overlay redraw
+        # Timer to trigger overlay redraw and keep it on top
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_overlay)
         self.timer.start(100)  # Redraw every 100ms
@@ -252,12 +307,22 @@ class VideoWidget(QWidget):
     def resizeEvent(self, event):
         """Update overlay size when video widget is resized"""
         super().resizeEvent(event)
-        self.crosshair.resize(self.video_frame.size())
+        self.hud.setGeometry(0, 0, self.video_frame.width(), self.video_frame.height())
+        self.hud.raise_()  # Keep overlay on top
 
     def update_overlay(self):
-        """Update crosshair overlay"""
-        self.crosshair.resize(self.video_frame.size())
-        self.crosshair.update()
+        """Update HUD overlay and keep it on top"""
+        self.hud.setGeometry(0, 0, self.video_frame.width(), self.video_frame.height())
+        self.hud.raise_()  # Ensure overlay stays on top of VLC
+        self.hud.update()
+
+    def update_ping(self, ping_ms):
+        """Update ping display on HUD"""
+        self.hud.set_ping(ping_ms)
+
+    def update_packets(self, packets):
+        """Update packets sent on HUD"""
+        self.hud.set_packets(packets)
 
     def start_stream(self):
         """Start RTSP stream playback"""
@@ -544,10 +609,16 @@ class MainWindow(QMainWindow):
 
     def on_ping_result(self, latency):
         """Handle ping result from ping thread"""
+        # Update HUD overlay on video
+        self.video_widget.update_ping(latency)
+        # Also update telemetry widget
         self.telemetry_widget.update_ping(latency)
 
     def update_stats(self):
         """Update statistics display"""
+        # Update HUD overlay on video
+        self.video_widget.update_packets(self.packets_sent)
+        # Also update telemetry widget
         self.telemetry_widget.update_stats(self.packets_sent)
 
     def keyPressEvent(self, event: QKeyEvent):
