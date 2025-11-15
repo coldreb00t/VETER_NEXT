@@ -6,7 +6,7 @@ VPS_HOST="81.200.157.230"
 VPS_PORT="9000"
 RESOLUTION=${1:-"1280x720"}
 FRAMERATE=${2:-"30"}
-BITRATE=${3:-"1000"}  # Reduced from 2000 to 1000 for better stability
+BITRATE=${3:-"600"}  # Reduced from 1000 to 600 for better UDP stability
 
 echo "============================================"
 echo "Publishing Camera to MediaMTX (via UDP)"

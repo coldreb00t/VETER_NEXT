@@ -168,7 +168,9 @@ class HUDOverlay(QWidget):
     """Transparent overlay widget for drawing HUD (crosshair + ping)"""
 
     def __init__(self, parent=None):
-        super().__init__(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        # Create as frameless tool window, but WITHOUT WindowStaysOnTopHint
+        # This way it won't block other applications
+        super().__init__(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
 
         # Make window transparent
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -281,8 +283,14 @@ class VideoWidget(QWidget):
         super().__init__()
         self.rtsp_url = rtsp_url
 
-        # Create VLC instance
-        self.instance = vlc.Instance('--no-xlib')
+        # Create VLC instance with RTSP-over-TCP to avoid UDP packet loss
+        # --rtsp-tcp forces TCP instead of UDP for RTSP streams
+        # --network-caching=300 adds 300ms buffer for smoother playback
+        self.instance = vlc.Instance(
+            '--no-xlib',
+            '--rtsp-tcp',
+            '--network-caching=300'
+        )
         self.player = self.instance.media_player_new()
 
         # Create video frame
