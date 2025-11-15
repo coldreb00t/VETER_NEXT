@@ -69,6 +69,54 @@ class PingThread(QThread):
         self.running = False
 
 
+class TelemetryReceiver(QThread):
+    """Thread for receiving telemetry data from robot via UDP"""
+
+    telemetry_received = pyqtSignal(dict)  # Emits telemetry data
+
+    def __init__(self, robot_id=1):
+        super().__init__()
+        self.robot_id = robot_id
+        self.port = 9100 + robot_id  # Telemetry port: 9101, 9102, etc.
+        self.running = True
+        self.sock = None
+
+    def run(self):
+        """Listen for telemetry data"""
+        try:
+            # Create UDP socket for receiving telemetry
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.bind(('0.0.0.0', self.port))
+            self.sock.settimeout(1.0)  # 1 second timeout
+
+            print(f"[Telemetry] Listening on port {self.port}")
+
+            while self.running:
+                try:
+                    data, addr = self.sock.recvfrom(2048)
+
+                    # Parse JSON telemetry
+                    telemetry = json.loads(data.decode('utf-8'))
+                    self.telemetry_received.emit(telemetry)
+
+                except socket.timeout:
+                    # No data received, that's OK
+                    pass
+                except json.JSONDecodeError as e:
+                    print(f"[Telemetry] Invalid JSON: {e}")
+                except Exception as e:
+                    print(f"[Telemetry] Error: {e}")
+
+        except Exception as e:
+            print(f"[Telemetry] Failed to start: {e}")
+
+    def stop(self):
+        """Stop the telemetry receiver"""
+        self.running = False
+        if self.sock:
+            self.sock.close()
+
+
 class RobotConnection:
     """UDP connection to robot for sending commands"""
 
@@ -467,16 +515,12 @@ class TelemetryWidget(QWidget):
         telemetry_group = QGroupBox("Robot Telemetry")
         telemetry_layout = QVBoxLayout()
 
-        # Ping/latency label with color coding
-        self.ping_label = QLabel("Ping: --")
-        self.ping_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 5px;")
-        telemetry_layout.addWidget(self.ping_label)
-
-        # Telemetry text area
+        # Telemetry text area (larger now without ping duplication)
         self.telemetry_text = QTextEdit()
         self.telemetry_text.setReadOnly(True)
-        self.telemetry_text.setMaximumHeight(120)
-        self.telemetry_text.setPlainText("UDP Control Active\n\nLightweight protocol\nNo installation required\nLow latency")
+        self.telemetry_text.setMinimumHeight(180)
+        self.telemetry_text.setStyleSheet("font-family: monospace; font-size: 12px;")
+        self.telemetry_text.setPlainText("Waiting for telemetry data...")
 
         telemetry_layout.addWidget(self.telemetry_text)
         telemetry_group.setLayout(telemetry_layout)
@@ -484,71 +528,51 @@ class TelemetryWidget(QWidget):
 
         self.setLayout(layout)
 
-        # Stats
-        self.packets_sent = 0
-        self.last_latency = -1
-
-    def update_ping(self, latency):
-        """Update ping display with color coding"""
-        self.last_latency = latency
-
-        if latency < 0:
-            # Ping failed
-            self.ping_label.setText("Ping: TIMEOUT")
-            self.ping_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; padding: 5px; "
-                "background-color: red; color: white;"
-            )
-        elif latency < 50:
-            # Excellent (<50ms)
-            self.ping_label.setText(f"Ping: {latency:.1f} ms")
-            self.ping_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; padding: 5px; "
-                "background-color: green; color: white;"
-            )
-        elif latency < 150:
-            # Good (50-150ms)
-            self.ping_label.setText(f"Ping: {latency:.1f} ms")
-            self.ping_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; padding: 5px; "
-                "background-color: orange; color: white;"
-            )
-        else:
-            # Poor (>150ms)
-            self.ping_label.setText(f"Ping: {latency:.1f} ms")
-            self.ping_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; padding: 5px; "
-                "background-color: red; color: white;"
-            )
-
-    def update_stats(self, packets_sent):
-        """Update statistics"""
-        self.packets_sent = packets_sent
-
-        # Update telemetry text
-        text = "Connection Status:\n"
-        text += f"Protocol: UDP\n"
-        text += f"Packets Sent: {self.packets_sent}\n"
-
-        if self.last_latency >= 0:
-            text += f"Latency: {self.last_latency:.1f} ms\n"
-
-            if self.last_latency < 50:
-                text += "Quality: Excellent"
-            elif self.last_latency < 150:
-                text += "Quality: Good"
-            else:
-                text += "Quality: Poor"
-        else:
-            text += "Latency: No connection"
-
-        self.telemetry_text.setPlainText(text)
+        # Telemetry data
+        self.battery_voltage = 0.0
+        self.battery_percent = 0
+        self.latitude = 0.0
+        self.longitude = 0.0
+        self.speed = 0.0
+        self.current_left = 0.0
+        self.current_right = 0.0
 
     def update_telemetry(self, data):
-        """Update telemetry display"""
-        text = "Robot Status:\n"
-        for key, value in data.items():
-            text += f"{key}: {value}\n"
+        """Update telemetry display from robot data"""
+        # Update internal data
+        self.battery_voltage = data.get('battery_voltage', 0.0)
+        self.battery_percent = data.get('battery_percent', 0)
+        self.latitude = data.get('latitude', 0.0)
+        self.longitude = data.get('longitude', 0.0)
+        self.speed = data.get('speed', 0.0)
+        self.current_left = data.get('current_left', 0.0)
+        self.current_right = data.get('current_right', 0.0)
+
+        # Format display text
+        text = "═══ ROBOT TELEMETRY ═══\n\n"
+
+        # Battery status
+        text += f"🔋 Battery:\n"
+        text += f"   Voltage: {self.battery_voltage:.1f} V\n"
+        text += f"   Charge:  {self.battery_percent}%\n\n"
+
+        # GPS position
+        text += f"📍 GPS Position:\n"
+        if self.latitude != 0.0 or self.longitude != 0.0:
+            text += f"   Lat:  {self.latitude:.6f}°\n"
+            text += f"   Lon:  {self.longitude:.6f}°\n\n"
+        else:
+            text += f"   No GPS fix\n\n"
+
+        # Speed
+        text += f"🏃 Speed:\n"
+        text += f"   {self.speed:.2f} m/s\n\n"
+
+        # Motor currents
+        text += f"⚡ Motor Current:\n"
+        text += f"   Left:  {self.current_left:.1f} A\n"
+        text += f"   Right: {self.current_right:.1f} A\n"
+
         self.telemetry_text.setPlainText(text)
 
 
@@ -622,6 +646,11 @@ class MainWindow(QMainWindow):
         self.ping_thread.ping_result.connect(self.on_ping_result)
         self.ping_thread.start()
 
+        # Start telemetry receiver thread
+        self.telemetry_receiver = TelemetryReceiver(robot_id=robot_id)
+        self.telemetry_receiver.telemetry_received.connect(self.on_telemetry_received)
+        self.telemetry_receiver.start()
+
         # Timer for updating stats
         self.stats_timer = QTimer()
         self.stats_timer.timeout.connect(self.update_stats)
@@ -650,17 +679,17 @@ class MainWindow(QMainWindow):
 
     def on_ping_result(self, latency):
         """Handle ping result from ping thread"""
-        # Update HUD overlay on video
+        # Update HUD overlay on video only (no duplication in telemetry)
         self.video_widget.update_ping(latency)
-        # Also update telemetry widget
-        self.telemetry_widget.update_ping(latency)
+
+    def on_telemetry_received(self, telemetry):
+        """Handle telemetry data from robot"""
+        self.telemetry_widget.update_telemetry(telemetry)
 
     def update_stats(self):
         """Update statistics display"""
-        # Update HUD overlay on video
+        # Update HUD overlay on video only
         self.video_widget.update_packets(self.packets_sent)
-        # Also update telemetry widget
-        self.telemetry_widget.update_stats(self.packets_sent)
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle keyboard control"""
@@ -696,6 +725,10 @@ class MainWindow(QMainWindow):
         # Stop ping thread
         self.ping_thread.stop()
         self.ping_thread.wait()  # Wait for thread to finish
+
+        # Stop telemetry receiver thread
+        self.telemetry_receiver.stop()
+        self.telemetry_receiver.wait()  # Wait for thread to finish
 
         event.accept()
 
