@@ -18,11 +18,12 @@ Example:
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
 import socket
 import json
 import sys
 import os
+import math
 
 
 class TelemetryPublisher(Node):
@@ -61,11 +62,11 @@ class TelemetryPublisher(Node):
             10
         )
 
-        # Subscribe to cmd_vel to estimate speed
+        # Subscribe to GPS velocity (real ground speed)
         self.create_subscription(
-            Twist,
-            '/cmd_vel',
-            self.cmd_vel_callback,
+            TwistStamped,
+            '/mavros/mavros/raw/gps_vel',
+            self.gps_vel_callback,
             10
         )
 
@@ -77,10 +78,12 @@ class TelemetryPublisher(Node):
         self.latitude = msg.latitude
         self.longitude = msg.longitude
 
-    def cmd_vel_callback(self, msg):
-        """Update speed from cmd_vel (approximation)"""
-        # Linear speed in m/s
-        self.speed = abs(msg.linear.x)
+    def gps_vel_callback(self, msg):
+        """Update speed from GPS velocity (real ground speed)"""
+        # Calculate ground speed from GPS velocity (sqrt(vx^2 + vy^2))
+        vx = msg.twist.linear.x
+        vy = msg.twist.linear.y
+        self.speed = math.sqrt(vx * vx + vy * vy)
 
     def send_telemetry(self):
         """Send telemetry data to client via UDP"""
