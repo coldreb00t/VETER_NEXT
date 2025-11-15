@@ -56,7 +56,7 @@ class TelemetryPublisher(Node):
         # Subscribe to GPS data
         self.create_subscription(
             NavSatFix,
-            '/mavros/global_position/global',
+            '/mavros/mavros/global',
             self.gps_callback,
             10
         )
