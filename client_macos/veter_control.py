@@ -772,86 +772,95 @@ class MapWidget(QWidget):
         self.map_view = QWebEngineView()
         self.map_view.setMinimumHeight(300)
 
-        # HTML с OpenStreetMap (без attribution)
+        # HTML с Яндекс.Картами
         html = """
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <title>Карта робота VETER</title>
+            <script src="https://api-maps.yandex.ru/2.1/?apikey=&lang=ru_RU" type="text/javascript"></script>
             <style>
                 body { margin: 0; padding: 0; }
                 #map { height: 100vh; width: 100%; }
-                /* Скрыть attribution OpenStreetMap */
-                .leaflet-control-attribution { display: none !important; }
             </style>
         </head>
         <body>
             <div id="map"></div>
-            <script>
-                // Инициализация карты (по умолчанию Москва)
-                var map = L.map('map', {
-                    attributionControl: false  // Отключить attribution
-                }).setView([55.751244, 37.618423], 13);
+            <script type="text/javascript">
+                var myMap;
+                var robotPlacemark;
+                var trackPolyline;
+                var trackPoints = [];
 
-                // OpenStreetMap тайлы
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19
-                }).addTo(map);
+                ymaps.ready(init);
 
-                // Маркер робота (красный)
-                var robotIcon = L.icon({
-                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxMiIgZmlsbD0iI2ZmMDAwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSI0IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 16]
-                });
+                function init() {
+                    // Создание карты (центр Москва по умолчанию)
+                    myMap = new ymaps.Map("map", {
+                        center: [55.751244, 37.618423],
+                        zoom: 13,
+                        controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
+                    });
 
-                var marker = L.marker([55.751244, 37.618423], {icon: robotIcon}).addTo(map);
-                marker.bindPopup("<b>Робот VETER</b><br>Ожидание GPS...").openPopup();
+                    // Маркер робота (красная метка)
+                    robotPlacemark = new ymaps.Placemark([55.751244, 37.618423], {
+                        balloonContent: '<b>Робот VETER</b><br>Ожидание GPS...',
+                        iconCaption: 'VETER'
+                    }, {
+                        preset: 'islands#redDotIcon',
+                        draggable: false
+                    });
+
+                    myMap.geoObjects.add(robotPlacemark);
+
+                    // Линия трека (синяя)
+                    trackPolyline = new ymaps.Polyline([], {}, {
+                        strokeColor: '#0000FF',
+                        strokeWidth: 3,
+                        strokeOpacity: 0.7
+                    });
+
+                    myMap.geoObjects.add(trackPolyline);
+                }
 
                 // Функция обновления позиции робота
                 function updateRobotPosition(lat, lon) {
-                    if (lat !== 0 || lon !== 0) {
-                        marker.setLatLng([lat, lon]);
-                        marker.setPopupContent("<b>Робот VETER</b><br>Широта: " + lat.toFixed(6) + "°<br>Долгота: " + lon.toFixed(6) + "°");
+                    if (!myMap || lat === 0 || lon === 0) return;
 
-                        // Центрировать карту на роботе только если это первое обновление
-                        if (!window.mapCentered) {
-                            map.setView([lat, lon], 16);
-                            window.mapCentered = true;
-                        }
+                    robotPlacemark.geometry.setCoordinates([lat, lon]);
+                    robotPlacemark.properties.set('balloonContent',
+                        '<b>Робот VETER</b><br>Широта: ' + lat.toFixed(6) + '°<br>Долгота: ' + lon.toFixed(6) + '°'
+                    );
+                    robotPlacemark.properties.set('iconCaption', 'VETER');
+
+                    // Центрировать карту только при первом обновлении
+                    if (!window.mapCentered) {
+                        myMap.setCenter([lat, lon], 16);
+                        window.mapCentered = true;
                     }
                 }
 
-                // Трек движения робота (синяя линия)
-                var trackPoints = [];
-                var trackLine = L.polyline([], {color: 'blue', weight: 3, opacity: 0.7}).addTo(map);
-
+                // Функция добавления точки в трек
                 function addTrackPoint(lat, lon) {
-                    if (lat !== 0 || lon !== 0) {
-                        trackPoints.push([lat, lon]);
-                        // Ограничить количество точек трека (последние 1000)
-                        if (trackPoints.length > 1000) {
-                            trackPoints.shift();
-                        }
-                        trackLine.setLatLngs(trackPoints);
+                    if (!myMap || lat === 0 || lon === 0) return;
+
+                    trackPoints.push([lat, lon]);
+
+                    // Ограничить количество точек трека (последние 1000)
+                    if (trackPoints.length > 1000) {
+                        trackPoints.shift();
                     }
+
+                    trackPolyline.geometry.setCoordinates(trackPoints);
                 }
 
-                // Кнопка центрирования на роботе
-                var centerButton = L.control({position: 'topright'});
-                centerButton.onAdd = function(map) {
-                    var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-                    div.innerHTML = '<a href="#" title="Центрировать на роботе" style="font-size: 18px; width: 30px; height: 30px; line-height: 30px; text-align: center; text-decoration: none;">🎯</a>';
-                    div.onclick = function(e) {
-                        e.preventDefault();
-                        var pos = marker.getLatLng();
-                        map.setView(pos, 16);
-                    };
-                    return div;
-                };
-                centerButton.addTo(map);
+                // Функция центрирования на роботе (вызывается по кнопке)
+                function centerOnRobot() {
+                    if (!myMap || !robotPlacemark) return;
+                    var coords = robotPlacemark.geometry.getCoordinates();
+                    myMap.setCenter(coords, 16);
+                }
             </script>
         </body>
         </html>
