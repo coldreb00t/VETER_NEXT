@@ -701,15 +701,13 @@ class TelemetryWidget(QWidget):
         self.battery_voltage_label.setText(f"Voltage: {voltage:.1f} V")
         self.battery_percent_label.setText(f"Charge: {percent}%")
 
-        # GPS
+        # GPS - always show coordinates even without fix
         lat = data.get('latitude', 0.0)
         lon = data.get('longitude', 0.0)
-        if lat != 0.0 or lon != 0.0:
-            self.gps_lat_label.setText(f"Lat: {lat:.6f}°")
-            self.gps_lon_label.setText(f"Lon: {lon:.6f}°")
-        else:
-            self.gps_lat_label.setText("No GPS fix")
-            self.gps_lon_label.setText("")
+
+        # Always display coordinates
+        self.gps_lat_label.setText(f"Lat: {lat:.6f}°")
+        self.gps_lon_label.setText(f"Lon: {lon:.6f}°")
 
         # Speed
         speed = data.get('speed', 0.0)
@@ -857,6 +855,11 @@ class MainWindow(QMainWindow):
 
     def on_telemetry_received(self, telemetry):
         """Handle telemetry data from robot"""
+        # Debug: print received telemetry
+        lat = telemetry.get('latitude', 0.0)
+        lon = telemetry.get('longitude', 0.0)
+        print(f"[Telemetry] GPS: {lat:.6f}, {lon:.6f} | Speed: {telemetry.get('speed', 0.0):.2f} m/s")
+
         # Update telemetry widget
         self.telemetry_widget.update_telemetry(telemetry)
 
