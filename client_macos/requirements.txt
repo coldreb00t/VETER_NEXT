@@ -1,8 +1,9 @@
 # VETER Robot Control Client - Dependencies
 # Simple UDP-based control, no ROS2 installation required!
 
-PyQt6==6.7.0           # GUI framework
-python-vlc==3.0.20123  # VLC bindings for video streaming
+PyQt6==6.7.0              # GUI framework
+PyQt6-WebEngine==6.7.0    # Web engine for embedded maps
+python-vlc==3.0.20123     # VLC bindings for video streaming
 
-# That's it! Only 2 dependencies + VLC application
+# That's it! Only 3 dependencies + VLC application
 # socket and json are built into Python
