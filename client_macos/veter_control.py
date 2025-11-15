@@ -276,8 +276,8 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout()
 
         # Left side: Video stream
-        # Multi-robot support: each robot has its own camera stream path
-        rtsp_url = f"rtsp://81.200.157.230:8555/camera{robot_id}"
+        # Note: Each robot has unique IP, so camera stream is already unique
+        rtsp_url = f"rtsp://81.200.157.230:8555/camera"
         self.video_widget = VideoWidget(rtsp_url)
         main_layout.addWidget(self.video_widget, stretch=2)
 
