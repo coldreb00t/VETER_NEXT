@@ -1,0 +1,5 @@
+# VETER Robot Control Client - Dependencies
+
+PyQt6==6.7.0
+paramiko==3.4.0
+python-vlc==3.0.20123
