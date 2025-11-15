@@ -84,9 +84,9 @@ def main():
             print(f"Error: Invalid robot ID '{sys.argv[1]}'")
             sys.exit(1)
 
-    # Set ROS_DOMAIN_ID based on robot ID (to avoid interference)
-    ros_domain_id = 10 + robot_id  # Domain 11, 12, 13, etc.
-    os.environ['ROS_DOMAIN_ID'] = str(ros_domain_id)
+    # Use default ROS_DOMAIN_ID (0) to match MAVROS and other nodes
+    # Multi-robot isolation will be handled by UDP port separation only
+    ros_domain_id = int(os.environ.get('ROS_DOMAIN_ID', '0'))
 
     print(f"=== VETER Robot #{robot_id} UDP Control Server ===")
     print(f"UDP Port: {9000 + robot_id}")

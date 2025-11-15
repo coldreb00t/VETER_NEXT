@@ -17,6 +17,7 @@ Example:
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import Twist, TwistStamped
 import socket
@@ -54,20 +55,27 @@ class TelemetryPublisher(Node):
         self.current_left = 0.0   # TODO: Subscribe to VESC status
         self.current_right = 0.0  # TODO: Subscribe to VESC status
 
-        # Subscribe to GPS data
+        # Create QoS profile for MAVROS topics (BEST_EFFORT to match MAVROS)
+        mavros_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+
+        # Subscribe to GPS data with RELIABLE QoS
         self.create_subscription(
             NavSatFix,
             '/mavros/mavros/global',
             self.gps_callback,
-            10
+            mavros_qos
         )
 
-        # Subscribe to GPS velocity (real ground speed)
+        # Subscribe to GPS velocity with RELIABLE QoS
         self.create_subscription(
             TwistStamped,
             '/mavros/mavros/raw/gps_vel',
             self.gps_vel_callback,
-            10
+            mavros_qos
         )
 
         # Timer to send telemetry at 5 Hz
@@ -129,9 +137,9 @@ def main():
         print(f"Usage: python3 udp_telemetry_publisher.py [robot_id] [client_ip]")
         sys.exit(1)
 
-    # Set ROS_DOMAIN_ID based on robot ID (to match control server)
-    ros_domain_id = 10 + robot_id  # Domain 11, 12, 13, etc.
-    os.environ['ROS_DOMAIN_ID'] = str(ros_domain_id)
+    # Use default ROS_DOMAIN_ID (0) to match MAVROS and other nodes
+    # Multi-robot isolation will be handled by UDP port separation only
+    ros_domain_id = int(os.environ.get('ROS_DOMAIN_ID', '0'))
 
     print(f"=== VETER Robot #{robot_id} Telemetry Publisher ===")
     print(f"Sending to: {client_ip}:{9100 + robot_id}")
