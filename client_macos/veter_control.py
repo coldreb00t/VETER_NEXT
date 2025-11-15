@@ -19,8 +19,16 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QThread, QUrl
 from PyQt6.QtGui import QKeyEvent, QPainter, QPen, QColor
-from PyQt6.QtWebEngineWidgets import QWebEngineView
 import vlc
+
+# Опциональный импорт WebEngine для карты
+try:
+    from PyQt6.QtWebEngineWidgets import QWebEngineView
+    WEBENGINE_AVAILABLE = True
+except ImportError:
+    WEBENGINE_AVAILABLE = False
+    print("[WARNING] PyQt6-WebEngine not available - map widget will be disabled")
+    print("[INFO] To enable map: pip install PyQt6-WebEngine")
 
 
 class PingThread(QThread):
@@ -736,6 +744,30 @@ class MapWidget(QWidget):
         map_layout = QVBoxLayout()
         map_layout.setContentsMargins(5, 5, 5, 5)
 
+        if not WEBENGINE_AVAILABLE:
+            # Заглушка вместо карты
+            fallback_label = QLabel(
+                "⚠️ Карта недоступна\n\n"
+                "PyQt6-WebEngine не установлен.\n\n"
+                "Для включения карты:\n"
+                "pip install PyQt6-WebEngine\n\n"
+                "Координаты робота отображаются\n"
+                "в секции телеметрии выше."
+            )
+            fallback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            fallback_label.setStyleSheet(
+                "color: gray; font-size: 11px; padding: 40px;"
+            )
+            fallback_label.setMinimumHeight(200)
+            map_layout.addWidget(fallback_label)
+            map_group.setLayout(map_layout)
+            layout.addWidget(map_group)
+            self.setLayout(layout)
+            self.webengine_available = False
+            return
+
+        self.webengine_available = True
+
         # WebEngine view для карты
         self.map_view = QWebEngineView()
         self.map_view.setMinimumHeight(300)
@@ -837,6 +869,9 @@ class MapWidget(QWidget):
 
     def update_position(self, lat, lon):
         """Обновить позицию робота на карте"""
+        if not self.webengine_available:
+            return  # WebEngine недоступен
+
         if lat == 0.0 and lon == 0.0:
             return  # Игнорировать нулевые координаты
 
