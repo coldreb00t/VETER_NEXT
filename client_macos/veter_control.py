@@ -5,101 +5,109 @@ Simple, fast GUI for robot control and video streaming
 """
 
 import sys
-import os
+import json
+import socket
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDialog, QGridLayout, QSlider,
     QGroupBox, QTextEdit
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
 import vlc
 
-# ROS2 imports
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist
 
+class RobotConnection:
+    """UDP connection to robot for sending commands"""
 
-class RobotConnection(Node):
-    """ROS2 node for robot communication"""
-
-    def __init__(self):
-        super().__init__('veter_control_client')
-
+    def __init__(self, robot_id=1):
         self.connected = False
         self.host = None
-
-        # Create publisher for velocity commands
-        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-
-        print("[ROS2] Created /cmd_vel publisher")
+        self.robot_id = robot_id
+        self.port = 9000 + robot_id  # UDP port: 9001, 9002, 9003, etc.
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def connect(self, host):
         """Set connection parameters"""
         self.host = host
         self.connected = True
-        print(f"[ROS2] Ready to publish to robot at {host}")
+        print(f"[UDP] Robot #{self.robot_id} ready to send commands to {host}:{self.port}")
         return True
 
     def send_velocity(self, linear_x, angular_z):
-        """Send velocity command to robot via ROS2"""
+        """Send velocity command to robot via UDP"""
         if not self.connected:
             return False
 
-        # Create Twist message
-        msg = Twist()
-        msg.linear.x = float(linear_x)
-        msg.linear.y = 0.0
-        msg.linear.z = 0.0
-        msg.angular.x = 0.0
-        msg.angular.y = 0.0
-        msg.angular.z = float(angular_z)
+        # Create JSON message
+        msg = {
+            'linear': float(linear_x),
+            'angular': float(angular_z)
+        }
 
-        # Publish
-        self.cmd_vel_pub.publish(msg)
-        return True
+        try:
+            # Send UDP packet
+            data = json.dumps(msg).encode('utf-8')
+            self.sock.sendto(data, (self.host, self.port))
+            return True
+        except Exception as e:
+            print(f"[UDP] Send error: {e}")
+            return False
 
     def disconnect(self):
         """Disconnect from robot"""
         self.connected = False
-        print("[ROS2] Disconnected")
+        self.sock.close()
+        print("[UDP] Disconnected")
 
 
 class ConnectDialog(QDialog):
-    """Connection dialog for entering robot IP"""
+    """Connection dialog for entering robot IP and ID"""
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Connect to VETER Robot")
-        self.setFixedSize(400, 150)
+        self.setFixedSize(450, 180)
 
         layout = QGridLayout()
 
+        # Robot ID (for multi-robot support)
+        layout.addWidget(QLabel("Robot ID:"), 0, 0)
+        self.id_input = QLineEdit()
+        self.id_input.setText("1")  # Default robot ID
+        self.id_input.setMaximumWidth(60)
+        layout.addWidget(self.id_input, 0, 1)
+
         # Robot IP
-        layout.addWidget(QLabel("Robot IP:"), 0, 0)
+        layout.addWidget(QLabel("Robot IP:"), 1, 0)
         self.ip_input = QLineEdit()
         self.ip_input.setText("100.112.41.76")  # Default Tailscale IP
-        layout.addWidget(self.ip_input, 0, 1)
+        layout.addWidget(self.ip_input, 1, 1)
 
         # Info label
-        info_label = QLabel("Note: ROS2 will connect via DDS (UDP multicast)")
+        info_label = QLabel("UDP control - supports multiple robots (ID 1-10)")
         info_label.setStyleSheet("color: gray; font-size: 10px;")
-        layout.addWidget(info_label, 1, 0, 1, 2)
+        layout.addWidget(info_label, 2, 0, 1, 2)
 
         # Connect button
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.clicked.connect(self.accept)
-        layout.addWidget(self.connect_btn, 2, 0, 1, 2)
+        layout.addWidget(self.connect_btn, 3, 0, 1, 2)
 
         self.setLayout(layout)
 
-        # Make IP input focused
-        self.ip_input.setFocus()
+        # Make ID input focused
+        self.id_input.setFocus()
 
     def get_connection_info(self):
         """Return connection parameters"""
+        try:
+            robot_id = int(self.id_input.text())
+        except ValueError:
+            robot_id = 1
+
         return {
+            'robot_id': robot_id,
             'host': self.ip_input.text()
         }
 
@@ -231,7 +239,7 @@ class TelemetryWidget(QWidget):
         self.telemetry_text = QTextEdit()
         self.telemetry_text.setReadOnly(True)
         self.telemetry_text.setMaximumHeight(150)
-        self.telemetry_text.setPlainText("ROS2 Control Active\n\nUsing direct DDS communication\nNo SSH overhead\nLow latency control")
+        self.telemetry_text.setPlainText("UDP Control Active\n\nLightweight protocol\nNo installation required\nLow latency")
 
         telemetry_layout.addWidget(self.telemetry_text)
         telemetry_group.setLayout(telemetry_layout)
@@ -250,13 +258,14 @@ class TelemetryWidget(QWidget):
 class MainWindow(QMainWindow):
     """Main application window"""
 
-    def __init__(self, connection_info, robot_node):
+    def __init__(self, connection_info, robot):
         super().__init__()
 
         self.connection_info = connection_info
-        self.robot = robot_node
+        self.robot = robot
+        robot_id = connection_info['robot_id']
 
-        self.setWindowTitle(f"VETER Robot Control - {connection_info['host']}")
+        self.setWindowTitle(f"VETER Robot #{robot_id} - {connection_info['host']}")
         self.setMinimumSize(1024, 768)
 
         # Central widget
@@ -267,7 +276,8 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout()
 
         # Left side: Video stream
-        rtsp_url = f"rtsp://81.200.157.230:8555/camera"  # Always use VPS for video
+        # Multi-robot support: each robot has its own camera stream path
+        rtsp_url = f"rtsp://81.200.157.230:8555/camera{robot_id}"
         self.video_widget = VideoWidget(rtsp_url)
         main_layout.addWidget(self.video_widget, stretch=2)
 
@@ -275,7 +285,7 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout()
 
         # Connection status
-        status_label = QLabel(f"Connected to: {connection_info['host']} (ROS2 DDS)")
+        status_label = QLabel(f"Robot #{robot_id} @ {connection_info['host']} (UDP)")
         status_label.setStyleSheet("background-color: green; color: white; padding: 10px; font-weight: bold;")
         right_layout.addWidget(status_label)
 
@@ -306,26 +316,17 @@ class MainWindow(QMainWindow):
         self.velocity_timer.timeout.connect(self.send_velocity)
         self.velocity_timer.start(100)  # 10 Hz command rate
 
-        # Timer for ROS2 spin
-        self.ros_timer = QTimer()
-        self.ros_timer.timeout.connect(self.ros_spin)
-        self.ros_timer.start(10)  # 100 Hz ROS2 spin
-
         self.current_linear = 0.0
         self.current_angular = 0.0
 
     def connect_to_robot(self):
-        """Connect to robot via ROS2"""
+        """Connect to robot via UDP"""
         success = self.robot.connect(self.connection_info['host'])
 
         if success:
-            print("[ROS2] Connected to robot successfully!")
+            print("[UDP] Connected to robot successfully!")
         else:
-            print("[ROS2] Failed to connect to robot")
-
-    def ros_spin(self):
-        """Spin ROS2 executor"""
-        rclpy.spin_once(self.robot, timeout_sec=0)
+            print("[UDP] Failed to connect to robot")
 
     def on_velocity_changed(self, linear, angular):
         """Handle velocity changes from control widget"""
@@ -364,7 +365,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Cleanup on close"""
         self.velocity_timer.stop()
-        self.ros_timer.stop()
         self.video_widget.stop_stream()
         self.robot.disconnect()
         event.accept()
@@ -372,9 +372,6 @@ class MainWindow(QMainWindow):
 
 def main():
     """Main application entry point"""
-
-    # Initialize ROS2
-    rclpy.init()
 
     # Create Qt application
     app = QApplication(sys.argv)
@@ -384,27 +381,15 @@ def main():
     if dialog.exec() == QDialog.DialogCode.Accepted:
         connection_info = dialog.get_connection_info()
 
-        # Set ROS2 environment for network communication
-        # This allows ROS2 to communicate across network via Tailscale
-        os.environ['ROS_DOMAIN_ID'] = '0'
-
-        # Create robot node
-        robot_node = RobotConnection()
+        # Create robot connection with robot ID
+        robot = RobotConnection(robot_id=connection_info['robot_id'])
 
         # Create and show main window
-        window = MainWindow(connection_info, robot_node)
+        window = MainWindow(connection_info, robot)
         window.show()
 
-        # Run application
-        result = app.exec()
-
-        # Shutdown ROS2
-        robot_node.destroy_node()
-        rclpy.shutdown()
-
-        sys.exit(result)
+        sys.exit(app.exec())
     else:
-        rclpy.shutdown()
         sys.exit(0)
 
 

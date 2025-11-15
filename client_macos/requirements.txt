@@ -1,8 +1,8 @@
 # VETER Robot Control Client - Dependencies
+# Simple UDP-based control, no ROS2 installation required!
 
-PyQt6==6.7.0
-python-vlc==3.0.20123
+PyQt6==6.7.0           # GUI framework
+python-vlc==3.0.20123  # VLC bindings for video streaming
 
-# ROS2 dependencies (requires ROS2 Humble installed on macOS)
-# Install ROS2 first: https://docs.ros.org/en/humble/Installation/macOS-Install-Binary.html
-# Then these will be available in the ROS2 environment
+# That's it! Only 2 dependencies + VLC application
+# socket and json are built into Python
