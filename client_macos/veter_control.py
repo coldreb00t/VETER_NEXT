@@ -112,49 +112,16 @@ class ConnectDialog(QDialog):
         }
 
 
-class VideoWidget(QWidget):
-    """VLC-based video streaming widget with crosshair overlay"""
+class CrosshairOverlay(QWidget):
+    """Transparent overlay widget for drawing crosshair"""
 
-    def __init__(self, rtsp_url):
-        super().__init__()
-        self.rtsp_url = rtsp_url
-
-        # Create VLC instance
-        self.instance = vlc.Instance('--no-xlib')
-        self.player = self.instance.media_player_new()
-
-        # Create video frame
-        self.video_frame = QWidget()
-        self.video_frame.setMinimumSize(640, 480)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.video_frame)
-        self.setLayout(layout)
-
-        # Set VLC output
-        if sys.platform.startswith('darwin'):  # macOS
-            self.player.set_nsobject(int(self.video_frame.winId()))
-
-        # Timer to trigger reticle redraw
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update)
-        self.timer.start(100)  # Redraw every 100ms
-
-    def start_stream(self):
-        """Start RTSP stream playback"""
-        media = self.instance.media_new(self.rtsp_url)
-        self.player.set_media(media)
-        self.player.play()
-
-    def stop_stream(self):
-        """Stop stream playback"""
-        self.player.stop()
-        self.timer.stop()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def paintEvent(self, event):
-        """Draw crosshair overlay on video"""
-        super().paintEvent(event)
-
+        """Draw crosshair overlay"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -196,6 +163,60 @@ class VideoWidget(QWidget):
         pen.setWidth(3)
         painter.setPen(pen)
         painter.drawPoint(center_x, center_y)
+
+
+class VideoWidget(QWidget):
+    """VLC-based video streaming widget with crosshair overlay"""
+
+    def __init__(self, rtsp_url):
+        super().__init__()
+        self.rtsp_url = rtsp_url
+
+        # Create VLC instance
+        self.instance = vlc.Instance('--no-xlib')
+        self.player = self.instance.media_player_new()
+
+        # Create video frame
+        self.video_frame = QWidget()
+        self.video_frame.setMinimumSize(640, 480)
+
+        # Create crosshair overlay
+        self.crosshair = CrosshairOverlay(self.video_frame)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.video_frame)
+        self.setLayout(layout)
+
+        # Set VLC output
+        if sys.platform.startswith('darwin'):  # macOS
+            self.player.set_nsobject(int(self.video_frame.winId()))
+
+        # Timer to trigger overlay redraw
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_overlay)
+        self.timer.start(100)  # Redraw every 100ms
+
+    def resizeEvent(self, event):
+        """Update overlay size when video widget is resized"""
+        super().resizeEvent(event)
+        self.crosshair.resize(self.video_frame.size())
+
+    def update_overlay(self):
+        """Update crosshair overlay"""
+        self.crosshair.resize(self.video_frame.size())
+        self.crosshair.update()
+
+    def start_stream(self):
+        """Start RTSP stream playback"""
+        media = self.instance.media_new(self.rtsp_url)
+        self.player.set_media(media)
+        self.player.play()
+
+    def stop_stream(self):
+        """Stop stream playback"""
+        self.player.stop()
+        self.timer.stop()
 
 
 class ControlWidget(QWidget):
