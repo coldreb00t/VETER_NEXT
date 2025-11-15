@@ -216,15 +216,21 @@ class HUDOverlay(QWidget):
     """Transparent overlay widget for drawing HUD (crosshair + ping)"""
 
     def __init__(self, parent=None):
-        # Create as frameless tool window, but WITHOUT WindowStaysOnTopHint
-        # This way it won't block other applications
-        super().__init__(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
+        # Create as frameless tool window that cannot receive focus
+        super().__init__(
+            parent,
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.Tool |
+            Qt.WindowType.WindowDoesNotAcceptFocus
+        )
 
-        # Make window transparent
+        # Make window transparent and click-through
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setWindowOpacity(1.0)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # HUD data
         self.ping_ms = -1
