@@ -168,10 +168,13 @@ class HUDOverlay(QWidget):
     """Transparent overlay widget for drawing HUD (crosshair + ping)"""
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(parent, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+
+        # Make window transparent
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+        self.setWindowOpacity(1.0)
 
         # HUD data
         self.ping_ms = -1
@@ -286,10 +289,6 @@ class VideoWidget(QWidget):
         self.video_frame = QWidget()
         self.video_frame.setMinimumSize(640, 480)
 
-        # Create HUD overlay (crosshair + ping)
-        self.hud = HUDOverlay(self.video_frame)
-        self.hud.setGeometry(0, 0, 640, 480)
-
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.video_frame)
@@ -299,21 +298,53 @@ class VideoWidget(QWidget):
         if sys.platform.startswith('darwin'):  # macOS
             self.player.set_nsobject(int(self.video_frame.winId()))
 
-        # Timer to trigger overlay redraw and keep it on top
+        # Create HUD overlay as separate top-level window
+        self.hud = HUDOverlay()
+        self.hud.setMinimumSize(640, 480)
+
+        # Timer to update overlay position and redraw
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_overlay)
-        self.timer.start(100)  # Redraw every 100ms
+        self.timer.start(50)  # 20 Hz updates
+
+    def showEvent(self, event):
+        """Show HUD when video widget is shown"""
+        super().showEvent(event)
+        self.update_overlay_position()
+        self.hud.show()
+
+    def hideEvent(self, event):
+        """Hide HUD when video widget is hidden"""
+        super().hideEvent(event)
+        self.hud.hide()
 
     def resizeEvent(self, event):
-        """Update overlay size when video widget is resized"""
+        """Update HUD position and size when resized"""
         super().resizeEvent(event)
-        self.hud.setGeometry(0, 0, self.video_frame.width(), self.video_frame.height())
-        self.hud.raise_()  # Keep overlay on top
+        self.update_overlay_position()
+
+    def moveEvent(self, event):
+        """Update HUD position when video widget moves"""
+        super().moveEvent(event)
+        self.update_overlay_position()
+
+    def update_overlay_position(self):
+        """Position HUD overlay over video frame"""
+        if self.video_frame.isVisible():
+            # Get global position of video frame
+            global_pos = self.video_frame.mapToGlobal(QPoint(0, 0))
+            # Set HUD geometry to match video frame
+            self.hud.setGeometry(
+                global_pos.x(),
+                global_pos.y(),
+                self.video_frame.width(),
+                self.video_frame.height()
+            )
+            self.hud.raise_()
 
     def update_overlay(self):
-        """Update HUD overlay and keep it on top"""
-        self.hud.setGeometry(0, 0, self.video_frame.width(), self.video_frame.height())
-        self.hud.raise_()  # Ensure overlay stays on top of VLC
+        """Update HUD position and redraw"""
+        self.update_overlay_position()
         self.hud.update()
 
     def update_ping(self, ping_ms):
@@ -334,6 +365,8 @@ class VideoWidget(QWidget):
         """Stop stream playback"""
         self.player.stop()
         self.timer.stop()
+        self.hud.hide()
+        self.hud.close()
 
 
 class ControlWidget(QWidget):
