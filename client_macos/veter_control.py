@@ -17,8 +17,9 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QDialog, QGridLayout, QSlider,
     QGroupBox, QTextEdit, QRadioButton, QButtonGroup
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QThread
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QThread, QUrl
 from PyQt6.QtGui import QKeyEvent, QPainter, QPen, QColor
+from PyQt6.QtWebEngineWidgets import QWebEngineView
 import vlc
 
 
@@ -721,6 +722,134 @@ class TelemetryWidget(QWidget):
         self.current_right_label.setText(f"П: {current_right:.1f} А")
 
 
+class MapWidget(QWidget):
+    """Виджет карты с позицией робота"""
+
+    def __init__(self):
+        super().__init__()
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Заголовок
+        map_group = QGroupBox("🗺️ Карта")
+        map_layout = QVBoxLayout()
+        map_layout.setContentsMargins(5, 5, 5, 5)
+
+        # WebEngine view для карты
+        self.map_view = QWebEngineView()
+        self.map_view.setMinimumHeight(300)
+
+        # HTML с Leaflet.js для OpenStreetMap
+        html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                body { margin: 0; padding: 0; }
+                #map { height: 100vh; width: 100%; }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <script>
+                // Инициализация карты (по умолчанию Москва)
+                var map = L.map('map').setView([55.751244, 37.618423], 13);
+
+                // OpenStreetMap тайлы
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(map);
+
+                // Маркер робота (красный)
+                var robotIcon = L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxMiIgZmlsbD0iI2ZmMDAwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSI0IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+
+                var marker = L.marker([55.751244, 37.618423], {icon: robotIcon}).addTo(map);
+                marker.bindPopup("<b>Робот VETER</b><br>Ожидание GPS...").openPopup();
+
+                // Функция обновления позиции робота
+                function updateRobotPosition(lat, lon) {
+                    if (lat !== 0 || lon !== 0) {
+                        marker.setLatLng([lat, lon]);
+                        marker.setPopupContent("<b>Робот VETER</b><br>Широта: " + lat.toFixed(6) + "°<br>Долгота: " + lon.toFixed(6) + "°");
+
+                        // Центрировать карту на роботе только если это первое обновление
+                        if (!window.mapCentered) {
+                            map.setView([lat, lon], 16);
+                            window.mapCentered = true;
+                        }
+                    }
+                }
+
+                // Трек движения робота (синяя линия)
+                var trackPoints = [];
+                var trackLine = L.polyline([], {color: 'blue', weight: 3, opacity: 0.7}).addTo(map);
+
+                function addTrackPoint(lat, lon) {
+                    if (lat !== 0 || lon !== 0) {
+                        trackPoints.push([lat, lon]);
+                        // Ограничить количество точек трека (последние 1000)
+                        if (trackPoints.length > 1000) {
+                            trackPoints.shift();
+                        }
+                        trackLine.setLatLngs(trackPoints);
+                    }
+                }
+
+                // Кнопка центрирования на роботе
+                var centerButton = L.control({position: 'topright'});
+                centerButton.onAdd = function(map) {
+                    var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                    div.innerHTML = '<a href="#" title="Центрировать на роботе" style="font-size: 18px; width: 30px; height: 30px; line-height: 30px; text-align: center; text-decoration: none;">🎯</a>';
+                    div.onclick = function(e) {
+                        e.preventDefault();
+                        var pos = marker.getLatLng();
+                        map.setView(pos, 16);
+                    };
+                    return div;
+                };
+                centerButton.addTo(map);
+            </script>
+        </body>
+        </html>
+        """
+
+        self.map_view.setHtml(html)
+        map_layout.addWidget(self.map_view)
+
+        map_group.setLayout(map_layout)
+        layout.addWidget(map_group)
+
+        self.setLayout(layout)
+
+        # Флаг для отслеживания первого обновления
+        self.first_update = True
+        self.last_lat = 0.0
+        self.last_lon = 0.0
+
+    def update_position(self, lat, lon):
+        """Обновить позицию робота на карте"""
+        if lat == 0.0 and lon == 0.0:
+            return  # Игнорировать нулевые координаты
+
+        # Обновить маркер
+        self.map_view.page().runJavaScript(f"updateRobotPosition({lat}, {lon});")
+
+        # Добавить точку в трек (только если координаты изменились)
+        if abs(lat - self.last_lat) > 0.00001 or abs(lon - self.last_lon) > 0.00001:
+            self.map_view.page().runJavaScript(f"addTrackPoint({lat}, {lon});")
+            self.last_lat = lat
+            self.last_lon = lon
+
+
 class MainWindow(QMainWindow):
     """Main application window"""
 
@@ -773,6 +902,10 @@ class MainWindow(QMainWindow):
         # Telemetry widget
         self.telemetry_widget = TelemetryWidget()
         right_layout.addWidget(self.telemetry_widget)
+
+        # Map widget
+        self.map_widget = MapWidget()
+        right_layout.addWidget(self.map_widget)
 
         # Add stretch to push everything up
         right_layout.addStretch()
@@ -863,6 +996,9 @@ class MainWindow(QMainWindow):
 
         # Update telemetry widget
         self.telemetry_widget.update_telemetry(telemetry)
+
+        # Update map with robot position
+        self.map_widget.update_position(lat, lon)
 
         # Update RC signal on HUD if available
         if 'rc_signal_db' in telemetry:
