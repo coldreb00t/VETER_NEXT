@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-VETER Robot Control Client for macOS
-Simple, fast GUI for robot control and video streaming
+Клиент управления роботом VETER для macOS
+Простой и быстрый интерфейс для управления роботом и видеопотока
 """
 
 import sys
@@ -162,93 +163,93 @@ class RobotConnection:
 
 
 class ConnectDialog(QDialog):
-    """Connection dialog for entering robot IP and ID"""
+    """Диалог подключения для ввода IP и ID робота"""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Connect to VETER Robot")
+        self.setWindowTitle("Подключение к роботу VETER")
         self.setFixedSize(500, 280)
 
         layout = QGridLayout()
 
-        # === Connection Type Selection ===
-        type_label = QLabel("Connection Type:")
+        # === Выбор типа подключения ===
+        type_label = QLabel("Тип подключения:")
         type_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(type_label, 0, 0, 1, 2)
 
-        # Radio buttons for connection type
+        # Радиокнопки для типа подключения
         self.channel_group = QButtonGroup()
 
-        self.direct_radio = QRadioButton("Direct (Fiber/Ethernet/WiFi)")
-        self.internet_radio = QRadioButton("Internet (Tailscale/Starlink/4G)")
+        self.direct_radio = QRadioButton("Прямое (Оптика/Ethernet/WiFi)")
+        self.internet_radio = QRadioButton("Интернет (Tailscale/Starlink/4G)")
 
         self.channel_group.addButton(self.direct_radio, 0)
         self.channel_group.addButton(self.internet_radio, 1)
 
-        # Default to Internet (most common)
+        # По умолчанию Интернет (наиболее частый)
         self.internet_radio.setChecked(True)
 
         layout.addWidget(self.direct_radio, 1, 0, 1, 2)
         layout.addWidget(self.internet_radio, 2, 0, 1, 2)
 
-        # Connect signals to update hints
+        # Подключить сигналы для обновления подсказок
         self.direct_radio.toggled.connect(self.on_channel_changed)
         self.internet_radio.toggled.connect(self.on_channel_changed)
 
-        # Separator
+        # Разделитель
         layout.addWidget(QLabel(""), 3, 0, 1, 2)
 
-        # === Robot Configuration ===
-        # Robot ID (for multi-robot support)
-        layout.addWidget(QLabel("Robot ID:"), 4, 0)
+        # === Конфигурация робота ===
+        # ID робота (для поддержки нескольких роботов)
+        layout.addWidget(QLabel("ID робота:"), 4, 0)
         self.id_input = QLineEdit()
-        self.id_input.setText("1")  # Default robot ID
+        self.id_input.setText("1")  # ID робота по умолчанию
         self.id_input.setMaximumWidth(60)
         layout.addWidget(self.id_input, 4, 1)
 
-        # Robot IP
-        layout.addWidget(QLabel("Robot IP:"), 5, 0)
+        # IP робота
+        layout.addWidget(QLabel("IP робота:"), 5, 0)
         self.ip_input = QLineEdit()
         layout.addWidget(self.ip_input, 5, 1)
 
-        # Info label (dynamic based on channel)
+        # Информационная метка (динамическая в зависимости от канала)
         self.info_label = QLabel()
         self.info_label.setStyleSheet("color: gray; font-size: 10px;")
         self.info_label.setWordWrap(True)
         layout.addWidget(self.info_label, 6, 0, 1, 2)
 
-        # Connect button
-        self.connect_btn = QPushButton("Connect")
+        # Кнопка подключения
+        self.connect_btn = QPushButton("Подключиться")
         self.connect_btn.clicked.connect(self.accept)
         layout.addWidget(self.connect_btn, 7, 0, 1, 2)
 
         self.setLayout(layout)
 
-        # Initialize hints and defaults
+        # Инициализировать подсказки и значения по умолчанию
         self.on_channel_changed()
 
-        # Make ID input focused
+        # Установить фокус на поле ID
         self.id_input.setFocus()
 
     def on_channel_changed(self):
-        """Update hints and defaults when connection type changes"""
+        """Обновить подсказки и значения по умолчанию при смене типа подключения"""
         if self.direct_radio.isChecked():
-            # Direct connection (local network)
-            self.ip_input.setPlaceholderText("e.g., 192.168.1.100")
+            # Прямое подключение (локальная сеть)
+            self.ip_input.setPlaceholderText("например, 192.168.1.100")
             self.ip_input.setText("")
             self.info_label.setText(
-                "Direct connection: Local IP address\n"
-                "Video: RTSP stream directly from robot\n"
-                "Use for: Fiber optic, Ethernet, or WiFi in local network"
+                "Прямое подключение: Локальный IP адрес\n"
+                "Видео: RTSP поток напрямую с робота\n"
+                "Использовать для: Оптоволокно, Ethernet или WiFi в локальной сети"
             )
         else:
-            # Internet connection (Tailscale)
-            self.ip_input.setPlaceholderText("e.g., 100.112.41.76")
-            self.ip_input.setText("100.112.41.76")  # Default Tailscale IP
+            # Подключение через интернет (Tailscale)
+            self.ip_input.setPlaceholderText("например, 100.112.41.76")
+            self.ip_input.setText("100.112.41.76")  # IP Tailscale по умолчанию
             self.info_label.setText(
-                "Internet connection: Tailscale VPN IP address\n"
-                "Video: RTSP stream via VPS (81.200.157.230)\n"
-                "Use for: Starlink, 4G/5G, or any remote access"
+                "Подключение через интернет: IP адрес Tailscale VPN\n"
+                "Видео: RTSP поток через VPS (81.200.157.230)\n"
+                "Использовать для: Starlink, 4G/5G или любой удаленный доступ"
             )
 
     def get_connection_info(self):
@@ -368,21 +369,21 @@ class HUDOverlay(QWidget):
         box_row_height = 25
         padding = 5
 
-        # Robot ping color
+        # Цвет пинга робота
         if self.ping_ms < 0:
             ping_color = QColor(200, 0, 0, 180)
-            ping_text = "TIMEOUT"
+            ping_text = "ТАЙМАУТ"
         elif self.ping_ms < 50:
             ping_color = QColor(0, 180, 0, 180)
-            ping_text = f"{self.ping_ms:.0f}ms"
+            ping_text = f"{self.ping_ms:.0f}мс"
         elif self.ping_ms < 150:
             ping_color = QColor(255, 165, 0, 180)
-            ping_text = f"{self.ping_ms:.0f}ms"
+            ping_text = f"{self.ping_ms:.0f}мс"
         else:
             ping_color = QColor(200, 0, 0, 180)
-            ping_text = f"{self.ping_ms:.0f}ms"
+            ping_text = f"{self.ping_ms:.0f}мс"
 
-        # Draw Robot ping row
+        # Нарисовать строку пинга робота
         painter.setBrush(QBrush(ping_color))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(box_x, box_y, box_width, box_row_height, 5, 5)
@@ -392,52 +393,52 @@ class HUDOverlay(QWidget):
         font_value = QFont("Arial", 12, QFont.Weight.Bold)
 
         painter.setFont(font_label)
-        painter.drawText(box_x + padding, box_y + 12, "Robot:")
+        painter.drawText(box_x + padding, box_y + 12, "Робот:")
         painter.setFont(font_value)
         painter.drawText(box_x + 50, box_y + 18, ping_text)
 
-        # Draw Camera ping row (VPS)
+        # Нарисовать строку пинга камеры (VPS)
         camera_y = box_y + box_row_height + 3
 
-        # Camera ping color
+        # Цвет пинга камеры
         if self.camera_ping_ms < 0:
             camera_ping_color = QColor(100, 100, 100, 180)
-            camera_ping_text = "--ms"
+            camera_ping_text = "--мс"
         elif self.camera_ping_ms < 50:
             camera_ping_color = QColor(0, 180, 0, 180)
-            camera_ping_text = f"{self.camera_ping_ms:.0f}ms"
+            camera_ping_text = f"{self.camera_ping_ms:.0f}мс"
         elif self.camera_ping_ms < 150:
             camera_ping_color = QColor(255, 165, 0, 180)
-            camera_ping_text = f"{self.camera_ping_ms:.0f}ms"
+            camera_ping_text = f"{self.camera_ping_ms:.0f}мс"
         else:
             camera_ping_color = QColor(200, 0, 0, 180)
-            camera_ping_text = f"{self.camera_ping_ms:.0f}ms"
+            camera_ping_text = f"{self.camera_ping_ms:.0f}мс"
 
         painter.setBrush(QBrush(camera_ping_color))
         painter.drawRoundedRect(box_x, camera_y, box_width, box_row_height, 5, 5)
 
         painter.setPen(QColor(255, 255, 255))
         painter.setFont(font_label)
-        painter.drawText(box_x + padding, camera_y + 12, "Camera:")
+        painter.drawText(box_x + padding, camera_y + 12, "Камера:")
         painter.setFont(font_value)
-        painter.drawText(box_x + 60, camera_y + 18, camera_ping_text)
+        painter.drawText(box_x + 65, camera_y + 18, camera_ping_text)
 
-        # Draw RC Signal row
+        # Нарисовать строку сигнала RC
         rc_y = camera_y + box_row_height + 3
 
-        # RC signal color (-40 dB = excellent, -100 dB = poor, -120 dB = lost)
+        # Цвет сигнала RC (-40 dB = отлично, -100 dB = плохо, -120 dB = потеряно)
         if self.rc_signal_db == -999:
             rc_color = QColor(100, 100, 100, 180)
-            rc_text = "--dB"
+            rc_text = "--дБ"
         elif self.rc_signal_db > -60:
-            rc_color = QColor(0, 180, 0, 180)  # Green - excellent
-            rc_text = f"{self.rc_signal_db}dB"
+            rc_color = QColor(0, 180, 0, 180)  # Зеленый - отлично
+            rc_text = f"{self.rc_signal_db}дБ"
         elif self.rc_signal_db > -100:
-            rc_color = QColor(255, 165, 0, 180)  # Orange - good
-            rc_text = f"{self.rc_signal_db}dB"
+            rc_color = QColor(255, 165, 0, 180)  # Оранжевый - хорошо
+            rc_text = f"{self.rc_signal_db}дБ"
         else:
-            rc_color = QColor(200, 0, 0, 180)  # Red - poor/lost
-            rc_text = "LOST"
+            rc_color = QColor(200, 0, 0, 180)  # Красный - плохо/потеряно
+            rc_text = "ПОТЕРЯНО"
 
         painter.setBrush(QBrush(rc_color))
         painter.drawRoundedRect(box_x, rc_y, box_width, box_row_height, 5, 5)
@@ -559,7 +560,7 @@ class VideoWidget(QWidget):
 
 
 class ControlWidget(QWidget):
-    """Robot control widget with virtual joystick"""
+    """Виджет управления роботом с виртуальным джойстиком"""
 
     velocity_changed = pyqtSignal(float, float)
 
@@ -571,12 +572,12 @@ class ControlWidget(QWidget):
 
         layout = QVBoxLayout()
 
-        # Control group
-        control_group = QGroupBox("Robot Control")
+        # Группа управления
+        control_group = QGroupBox("Управление роботом")
         control_layout = QGridLayout()
 
-        # Linear speed slider
-        control_layout.addWidget(QLabel("Forward/Backward:"), 0, 0)
+        # Слайдер линейной скорости
+        control_layout.addWidget(QLabel("Вперед/Назад:"), 0, 0)
         self.linear_slider = QSlider(Qt.Orientation.Horizontal)
         self.linear_slider.setMinimum(-100)
         self.linear_slider.setMaximum(100)
@@ -586,11 +587,11 @@ class ControlWidget(QWidget):
         self.linear_slider.valueChanged.connect(self.update_velocity)
         control_layout.addWidget(self.linear_slider, 0, 1)
 
-        self.linear_label = QLabel("0.0 m/s")
+        self.linear_label = QLabel("0.0 м/с")
         control_layout.addWidget(self.linear_label, 0, 2)
 
-        # Angular speed slider
-        control_layout.addWidget(QLabel("Left/Right:"), 1, 0)
+        # Слайдер угловой скорости
+        control_layout.addWidget(QLabel("Влево/Вправо:"), 1, 0)
         self.angular_slider = QSlider(Qt.Orientation.Horizontal)
         self.angular_slider.setMinimum(-100)
         self.angular_slider.setMaximum(100)
@@ -600,17 +601,17 @@ class ControlWidget(QWidget):
         self.angular_slider.valueChanged.connect(self.update_velocity)
         control_layout.addWidget(self.angular_slider, 1, 1)
 
-        self.angular_label = QLabel("0.0 rad/s")
+        self.angular_label = QLabel("0.0 рад/с")
         control_layout.addWidget(self.angular_label, 1, 2)
 
-        # Stop button
-        stop_btn = QPushButton("STOP")
+        # Кнопка остановки
+        stop_btn = QPushButton("СТОП")
         stop_btn.setStyleSheet("background-color: red; color: white; font-weight: bold; font-size: 16px;")
         stop_btn.clicked.connect(self.emergency_stop)
         control_layout.addWidget(stop_btn, 2, 0, 1, 3)
 
-        # Keyboard hint
-        hint_label = QLabel("Keyboard: W/S = forward/back, A/D = left/right, Space = stop")
+        # Подсказка по клавиатуре
+        hint_label = QLabel("Клавиатура: W/S = вперед/назад, A/D = влево/вправо, Пробел = стоп")
         hint_label.setStyleSheet("color: gray; font-size: 10px;")
         control_layout.addWidget(hint_label, 3, 0, 1, 3)
 
@@ -620,13 +621,13 @@ class ControlWidget(QWidget):
         self.setLayout(layout)
 
     def update_velocity(self):
-        """Update velocity from sliders"""
-        # Scale to reasonable values: linear 0-2 m/s, angular 0-2 rad/s
-        self.linear_speed = self.linear_slider.value() / 50.0  # -2.0 to 2.0 m/s
-        self.angular_speed = -self.angular_slider.value() / 50.0  # -2.0 to 2.0 rad/s (inverted)
+        """Обновить скорость из слайдеров"""
+        # Масштабировать до разумных значений: линейная 0-2 м/с, угловая 0-2 рад/с
+        self.linear_speed = self.linear_slider.value() / 50.0  # от -2.0 до 2.0 м/с
+        self.angular_speed = -self.angular_slider.value() / 50.0  # от -2.0 до 2.0 рад/с (инвертировано)
 
-        self.linear_label.setText(f"{self.linear_speed:.2f} m/s")
-        self.angular_label.setText(f"{self.angular_speed:.2f} rad/s")
+        self.linear_label.setText(f"{self.linear_speed:.2f} м/с")
+        self.angular_label.setText(f"{self.angular_speed:.2f} рад/с")
 
         self.velocity_changed.emit(self.linear_speed, self.angular_speed)
 
@@ -638,52 +639,52 @@ class ControlWidget(QWidget):
 
 
 class TelemetryWidget(QWidget):
-    """Telemetry display widget"""
+    """Виджет отображения телеметрии"""
 
     def __init__(self):
         super().__init__()
 
         layout = QVBoxLayout()
 
-        telemetry_group = QGroupBox("Robot Telemetry")
+        telemetry_group = QGroupBox("Телеметрия робота")
         telemetry_layout = QGridLayout()
         telemetry_layout.setSpacing(5)
 
-        # Battery section
-        battery_header = QLabel("🔋 Battery")
+        # Секция батареи
+        battery_header = QLabel("🔋 Батарея")
         battery_header.setStyleSheet("font-weight: bold; font-size: 12px;")
         telemetry_layout.addWidget(battery_header, 0, 0, 1, 2)
 
-        self.battery_voltage_label = QLabel("Voltage: -- V")
-        self.battery_percent_label = QLabel("Charge: --%")
+        self.battery_voltage_label = QLabel("Напряжение: -- В")
+        self.battery_percent_label = QLabel("Заряд: --%")
         telemetry_layout.addWidget(self.battery_voltage_label, 1, 0)
         telemetry_layout.addWidget(self.battery_percent_label, 1, 1)
 
-        # GPS section
+        # Секция GPS
         gps_header = QLabel("📍 GPS")
         gps_header.setStyleSheet("font-weight: bold; font-size: 12px;")
         telemetry_layout.addWidget(gps_header, 2, 0, 1, 2)
 
-        self.gps_lat_label = QLabel("Lat: --")
-        self.gps_lon_label = QLabel("Lon: --")
+        self.gps_lat_label = QLabel("Широта: --")
+        self.gps_lon_label = QLabel("Долгота: --")
         telemetry_layout.addWidget(self.gps_lat_label, 3, 0)
         telemetry_layout.addWidget(self.gps_lon_label, 3, 1)
 
-        # Speed section
-        speed_header = QLabel("🏃 Speed")
+        # Секция скорости
+        speed_header = QLabel("🏃 Скорость")
         speed_header.setStyleSheet("font-weight: bold; font-size: 12px;")
         telemetry_layout.addWidget(speed_header, 4, 0, 1, 2)
 
-        self.speed_label = QLabel("-- m/s")
+        self.speed_label = QLabel("-- м/с")
         telemetry_layout.addWidget(self.speed_label, 5, 0, 1, 2)
 
-        # Motor currents section
-        current_header = QLabel("⚡ Motors")
+        # Секция токов моторов
+        current_header = QLabel("⚡ Моторы")
         current_header.setStyleSheet("font-weight: bold; font-size: 12px;")
         telemetry_layout.addWidget(current_header, 6, 0, 1, 2)
 
-        self.current_left_label = QLabel("L: -- A")
-        self.current_right_label = QLabel("R: -- A")
+        self.current_left_label = QLabel("Л: -- А")
+        self.current_right_label = QLabel("П: -- А")
         telemetry_layout.addWidget(self.current_left_label, 7, 0)
         telemetry_layout.addWidget(self.current_right_label, 7, 1)
 
@@ -694,30 +695,30 @@ class TelemetryWidget(QWidget):
         self.setLayout(layout)
 
     def update_telemetry(self, data):
-        """Update telemetry display from robot data"""
-        # Battery
+        """Обновить отображение телеметрии из данных робота"""
+        # Батарея
         voltage = data.get('battery_voltage', 0.0)
         percent = data.get('battery_percent', 0)
-        self.battery_voltage_label.setText(f"Voltage: {voltage:.1f} V")
-        self.battery_percent_label.setText(f"Charge: {percent}%")
+        self.battery_voltage_label.setText(f"Напряжение: {voltage:.1f} В")
+        self.battery_percent_label.setText(f"Заряд: {percent}%")
 
-        # GPS - always show coordinates even without fix
+        # GPS - всегда показывать координаты даже без fix
         lat = data.get('latitude', 0.0)
         lon = data.get('longitude', 0.0)
 
-        # Always display coordinates
-        self.gps_lat_label.setText(f"Lat: {lat:.6f}°")
-        self.gps_lon_label.setText(f"Lon: {lon:.6f}°")
+        # Всегда отображать координаты
+        self.gps_lat_label.setText(f"Широта: {lat:.6f}°")
+        self.gps_lon_label.setText(f"Долгота: {lon:.6f}°")
 
-        # Speed
+        # Скорость
         speed = data.get('speed', 0.0)
-        self.speed_label.setText(f"{speed:.2f} m/s")
+        self.speed_label.setText(f"{speed:.2f} м/с")
 
-        # Motor currents
+        # Токи моторов
         current_left = data.get('current_left', 0.0)
         current_right = data.get('current_right', 0.0)
-        self.current_left_label.setText(f"L: {current_left:.1f} A")
-        self.current_right_label.setText(f"R: {current_right:.1f} A")
+        self.current_left_label.setText(f"Л: {current_left:.1f} А")
+        self.current_right_label.setText(f"П: {current_right:.1f} А")
 
 
 class MainWindow(QMainWindow):
@@ -730,7 +731,7 @@ class MainWindow(QMainWindow):
         self.robot = robot
         robot_id = connection_info['robot_id']
 
-        self.setWindowTitle(f"VETER Robot #{robot_id} - {connection_info['host']}")
+        self.setWindowTitle(f"Робот VETER #{robot_id} - {connection_info['host']}")
         self.setMinimumSize(1024, 768)
 
         # Central widget
@@ -745,13 +746,13 @@ class MainWindow(QMainWindow):
         channel_type = connection_info.get('channel_type', 'internet')
 
         if channel_type == 'direct':
-            # Direct connection: stream directly from robot
+            # Прямое подключение: поток напрямую с робота
             rtsp_url = f"rtsp://{connection_info['host']}:8554/camera"
-            channel_name = "Direct"
+            channel_name = "Прямое"
         else:
-            # Internet connection: stream via VPS
+            # Подключение через интернет: поток через VPS
             rtsp_url = f"rtsp://81.200.157.230:8555/camera"
-            channel_name = "Internet"
+            channel_name = "Интернет"
 
         self.video_widget = VideoWidget(rtsp_url)
         main_layout.addWidget(self.video_widget, stretch=2)
@@ -759,8 +760,8 @@ class MainWindow(QMainWindow):
         # Right side: Controls and telemetry
         right_layout = QVBoxLayout()
 
-        # Connection status
-        status_label = QLabel(f"Robot #{robot_id} @ {connection_info['host']} ({channel_name}, UDP)")
+        # Статус подключения
+        status_label = QLabel(f"Робот #{robot_id} @ {connection_info['host']} ({channel_name}, UDP)")
         status_label.setStyleSheet("background-color: green; color: white; padding: 10px; font-weight: bold;")
         right_layout.addWidget(status_label)
 
