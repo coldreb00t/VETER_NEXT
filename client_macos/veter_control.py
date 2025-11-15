@@ -233,12 +233,24 @@ class HUDOverlay(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
         # HUD data
-        self.ping_ms = -1
+        self.ping_ms = -1  # Robot ping
+        self.camera_ping_ms = -1  # Camera/VPS ping
+        self.rc_signal_db = -999  # RC signal strength in dB
         self.packets_sent = 0
 
     def set_ping(self, ping_ms):
-        """Update ping value"""
+        """Update robot ping value"""
         self.ping_ms = ping_ms
+        self.update()
+
+    def set_camera_ping(self, ping_ms):
+        """Update camera ping value"""
+        self.camera_ping_ms = ping_ms
+        self.update()
+
+    def set_rc_signal(self, signal_db):
+        """Update RC signal strength"""
+        self.rc_signal_db = signal_db
         self.update()
 
     def set_packets(self, packets):
@@ -291,43 +303,94 @@ class HUDOverlay(QWidget):
         painter.setPen(pen)
         painter.drawPoint(center_x, center_y)
 
-        # === DRAW PING INFO (top-left corner) ===
+        # === DRAW HUD INFO (top-left corner) ===
         from PyQt6.QtGui import QFont, QBrush
 
-        # Determine color based on ping
-        if self.ping_ms < 0:
-            bg_color = QColor(200, 0, 0, 180)  # Red with alpha
-            text = "TIMEOUT"
-        elif self.ping_ms < 50:
-            bg_color = QColor(0, 180, 0, 180)  # Green
-            text = f"{self.ping_ms:.0f} ms"
-        elif self.ping_ms < 150:
-            bg_color = QColor(255, 165, 0, 180)  # Orange
-            text = f"{self.ping_ms:.0f} ms"
-        else:
-            bg_color = QColor(200, 0, 0, 180)  # Red
-            text = f"{self.ping_ms:.0f} ms"
-
-        # Draw ping background box
         box_x = 10
         box_y = 10
-        box_width = 120
-        box_height = 60
+        box_width = 140
+        box_row_height = 25
+        padding = 5
 
-        painter.setBrush(QBrush(bg_color))
+        # Robot ping color
+        if self.ping_ms < 0:
+            ping_color = QColor(200, 0, 0, 180)
+            ping_text = "TIMEOUT"
+        elif self.ping_ms < 50:
+            ping_color = QColor(0, 180, 0, 180)
+            ping_text = f"{self.ping_ms:.0f}ms"
+        elif self.ping_ms < 150:
+            ping_color = QColor(255, 165, 0, 180)
+            ping_text = f"{self.ping_ms:.0f}ms"
+        else:
+            ping_color = QColor(200, 0, 0, 180)
+            ping_text = f"{self.ping_ms:.0f}ms"
+
+        # Draw Robot ping row
+        painter.setBrush(QBrush(ping_color))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(box_x, box_y, box_width, box_height, 5, 5)
+        painter.drawRoundedRect(box_x, box_y, box_width, box_row_height, 5, 5)
 
-        # Draw ping text
-        painter.setPen(QColor(255, 255, 255))  # White text
-        font = QFont("Arial", 14, QFont.Weight.Bold)
-        painter.setFont(font)
-        painter.drawText(box_x + 10, box_y + 25, text)
+        painter.setPen(QColor(255, 255, 255))
+        font_label = QFont("Arial", 10)
+        font_value = QFont("Arial", 12, QFont.Weight.Bold)
 
-        # Draw packets sent (smaller text)
-        font_small = QFont("Arial", 10)
-        painter.setFont(font_small)
-        painter.drawText(box_x + 10, box_y + 45, f"PKT: {self.packets_sent}")
+        painter.setFont(font_label)
+        painter.drawText(box_x + padding, box_y + 12, "Robot:")
+        painter.setFont(font_value)
+        painter.drawText(box_x + 50, box_y + 18, ping_text)
+
+        # Draw Camera ping row (VPS)
+        camera_y = box_y + box_row_height + 3
+
+        # Camera ping color
+        if self.camera_ping_ms < 0:
+            camera_ping_color = QColor(100, 100, 100, 180)
+            camera_ping_text = "--ms"
+        elif self.camera_ping_ms < 50:
+            camera_ping_color = QColor(0, 180, 0, 180)
+            camera_ping_text = f"{self.camera_ping_ms:.0f}ms"
+        elif self.camera_ping_ms < 150:
+            camera_ping_color = QColor(255, 165, 0, 180)
+            camera_ping_text = f"{self.camera_ping_ms:.0f}ms"
+        else:
+            camera_ping_color = QColor(200, 0, 0, 180)
+            camera_ping_text = f"{self.camera_ping_ms:.0f}ms"
+
+        painter.setBrush(QBrush(camera_ping_color))
+        painter.drawRoundedRect(box_x, camera_y, box_width, box_row_height, 5, 5)
+
+        painter.setPen(QColor(255, 255, 255))
+        painter.setFont(font_label)
+        painter.drawText(box_x + padding, camera_y + 12, "Camera:")
+        painter.setFont(font_value)
+        painter.drawText(box_x + 60, camera_y + 18, camera_ping_text)
+
+        # Draw RC Signal row
+        rc_y = camera_y + box_row_height + 3
+
+        # RC signal color (-40 dB = excellent, -100 dB = poor, -120 dB = lost)
+        if self.rc_signal_db == -999:
+            rc_color = QColor(100, 100, 100, 180)
+            rc_text = "--dB"
+        elif self.rc_signal_db > -60:
+            rc_color = QColor(0, 180, 0, 180)  # Green - excellent
+            rc_text = f"{self.rc_signal_db}dB"
+        elif self.rc_signal_db > -100:
+            rc_color = QColor(255, 165, 0, 180)  # Orange - good
+            rc_text = f"{self.rc_signal_db}dB"
+        else:
+            rc_color = QColor(200, 0, 0, 180)  # Red - poor/lost
+            rc_text = "LOST"
+
+        painter.setBrush(QBrush(rc_color))
+        painter.drawRoundedRect(box_x, rc_y, box_width, box_row_height, 5, 5)
+
+        painter.setPen(QColor(255, 255, 255))
+        painter.setFont(font_label)
+        painter.drawText(box_x + padding, rc_y + 12, "RC:")
+        painter.setFont(font_value)
+        painter.drawText(box_x + 40, rc_y + 18, rc_text)
 
 
 class VideoWidget(QWidget):
@@ -410,8 +473,16 @@ class VideoWidget(QWidget):
         self.hud.update()
 
     def update_ping(self, ping_ms):
-        """Update ping display on HUD"""
+        """Update robot ping display on HUD"""
         self.hud.set_ping(ping_ms)
+
+    def update_camera_ping(self, ping_ms):
+        """Update camera ping display on HUD"""
+        self.hud.set_camera_ping(ping_ms)
+
+    def update_rc_signal(self, signal_db):
+        """Update RC signal display on HUD"""
+        self.hud.set_rc_signal(signal_db)
 
     def update_packets(self, packets):
         """Update packets sent on HUD"""
@@ -660,10 +731,15 @@ class MainWindow(QMainWindow):
         self.current_angular = 0.0
         self.packets_sent = 0
 
-        # Start ping thread
+        # Start ping thread for robot
         self.ping_thread = PingThread(self.connection_info['host'])
-        self.ping_thread.ping_result.connect(self.on_ping_result)
+        self.ping_thread.ping_result.connect(self.on_robot_ping_result)
         self.ping_thread.start()
+
+        # Start ping thread for camera/VPS
+        self.camera_ping_thread = PingThread('81.200.157.230')
+        self.camera_ping_thread.ping_result.connect(self.on_camera_ping_result)
+        self.camera_ping_thread.start()
 
         # Start telemetry receiver thread
         self.telemetry_receiver = TelemetryReceiver(robot_id=robot_id)
@@ -696,14 +772,24 @@ class MainWindow(QMainWindow):
             if success:
                 self.packets_sent += 1
 
-    def on_ping_result(self, latency):
-        """Handle ping result from ping thread"""
-        # Update HUD overlay on video only (no duplication in telemetry)
+    def on_robot_ping_result(self, latency):
+        """Handle robot ping result"""
+        # Update HUD overlay on video
         self.video_widget.update_ping(latency)
+
+    def on_camera_ping_result(self, latency):
+        """Handle camera/VPS ping result"""
+        # Update HUD overlay on video
+        self.video_widget.update_camera_ping(latency)
 
     def on_telemetry_received(self, telemetry):
         """Handle telemetry data from robot"""
+        # Update telemetry widget
         self.telemetry_widget.update_telemetry(telemetry)
+
+        # Update RC signal on HUD if available
+        if 'rc_signal_db' in telemetry:
+            self.video_widget.update_rc_signal(telemetry['rc_signal_db'])
 
     def update_stats(self):
         """Update statistics display"""
