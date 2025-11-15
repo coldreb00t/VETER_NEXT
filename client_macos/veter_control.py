@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QDialog, QGridLayout, QSlider,
     QGroupBox, QTextEdit
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint
+from PyQt6.QtGui import QKeyEvent, QPainter, QPen, QColor
 import vlc
 
 
@@ -113,7 +113,7 @@ class ConnectDialog(QDialog):
 
 
 class VideoWidget(QWidget):
-    """VLC-based video streaming widget"""
+    """VLC-based video streaming widget with crosshair overlay"""
 
     def __init__(self, rtsp_url):
         super().__init__()
@@ -135,6 +135,11 @@ class VideoWidget(QWidget):
         if sys.platform.startswith('darwin'):  # macOS
             self.player.set_nsobject(int(self.video_frame.winId()))
 
+        # Timer to trigger reticle redraw
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update)
+        self.timer.start(100)  # Redraw every 100ms
+
     def start_stream(self):
         """Start RTSP stream playback"""
         media = self.instance.media_new(self.rtsp_url)
@@ -144,6 +149,53 @@ class VideoWidget(QWidget):
     def stop_stream(self):
         """Stop stream playback"""
         self.player.stop()
+        self.timer.stop()
+
+    def paintEvent(self, event):
+        """Draw crosshair overlay on video"""
+        super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Get center of widget
+        center_x = self.width() // 2
+        center_y = self.height() // 2
+
+        # Crosshair settings
+        crosshair_size = 20
+        crosshair_gap = 5
+        crosshair_thickness = 2
+
+        # Set pen (green with transparency)
+        pen = QPen(QColor(0, 255, 0, 200))  # Green with alpha
+        pen.setWidth(crosshair_thickness)
+        painter.setPen(pen)
+
+        # Draw horizontal line (left and right from center)
+        painter.drawLine(
+            center_x - crosshair_size, center_y,
+            center_x - crosshair_gap, center_y
+        )
+        painter.drawLine(
+            center_x + crosshair_gap, center_y,
+            center_x + crosshair_size, center_y
+        )
+
+        # Draw vertical line (top and bottom from center)
+        painter.drawLine(
+            center_x, center_y - crosshair_size,
+            center_x, center_y - crosshair_gap
+        )
+        painter.drawLine(
+            center_x, center_y + crosshair_gap,
+            center_x, center_y + crosshair_size
+        )
+
+        # Draw center dot
+        pen.setWidth(3)
+        painter.setPen(pen)
+        painter.drawPoint(center_x, center_y)
 
 
 class ControlWidget(QWidget):
