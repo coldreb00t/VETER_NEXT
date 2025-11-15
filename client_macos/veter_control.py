@@ -155,7 +155,6 @@ class VideoWidget(QWidget):
     def start_stream(self):
         """Start RTSP stream playback"""
         media = self.instance.media_new(self.rtsp_url)
-        media.get_metas()
         self.player.set_media(media)
         self.player.play()
 
