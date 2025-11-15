@@ -14,7 +14,7 @@ import time
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDialog, QGridLayout, QSlider,
-    QGroupBox, QTextEdit
+    QGroupBox, QTextEdit, QRadioButton, QButtonGroup
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QThread
 from PyQt6.QtGui import QKeyEvent, QPainter, QPen, QColor
@@ -167,37 +167,89 @@ class ConnectDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Connect to VETER Robot")
-        self.setFixedSize(450, 180)
+        self.setFixedSize(500, 280)
 
         layout = QGridLayout()
 
+        # === Connection Type Selection ===
+        type_label = QLabel("Connection Type:")
+        type_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(type_label, 0, 0, 1, 2)
+
+        # Radio buttons for connection type
+        self.channel_group = QButtonGroup()
+
+        self.direct_radio = QRadioButton("Direct (Fiber/Ethernet/WiFi)")
+        self.internet_radio = QRadioButton("Internet (Tailscale/Starlink/4G)")
+
+        self.channel_group.addButton(self.direct_radio, 0)
+        self.channel_group.addButton(self.internet_radio, 1)
+
+        # Default to Internet (most common)
+        self.internet_radio.setChecked(True)
+
+        layout.addWidget(self.direct_radio, 1, 0, 1, 2)
+        layout.addWidget(self.internet_radio, 2, 0, 1, 2)
+
+        # Connect signals to update hints
+        self.direct_radio.toggled.connect(self.on_channel_changed)
+        self.internet_radio.toggled.connect(self.on_channel_changed)
+
+        # Separator
+        layout.addWidget(QLabel(""), 3, 0, 1, 2)
+
+        # === Robot Configuration ===
         # Robot ID (for multi-robot support)
-        layout.addWidget(QLabel("Robot ID:"), 0, 0)
+        layout.addWidget(QLabel("Robot ID:"), 4, 0)
         self.id_input = QLineEdit()
         self.id_input.setText("1")  # Default robot ID
         self.id_input.setMaximumWidth(60)
-        layout.addWidget(self.id_input, 0, 1)
+        layout.addWidget(self.id_input, 4, 1)
 
         # Robot IP
-        layout.addWidget(QLabel("Robot IP:"), 1, 0)
+        layout.addWidget(QLabel("Robot IP:"), 5, 0)
         self.ip_input = QLineEdit()
-        self.ip_input.setText("100.112.41.76")  # Default Tailscale IP
-        layout.addWidget(self.ip_input, 1, 1)
+        layout.addWidget(self.ip_input, 5, 1)
 
-        # Info label
-        info_label = QLabel("UDP control - supports multiple robots (ID 1-10)")
-        info_label.setStyleSheet("color: gray; font-size: 10px;")
-        layout.addWidget(info_label, 2, 0, 1, 2)
+        # Info label (dynamic based on channel)
+        self.info_label = QLabel()
+        self.info_label.setStyleSheet("color: gray; font-size: 10px;")
+        self.info_label.setWordWrap(True)
+        layout.addWidget(self.info_label, 6, 0, 1, 2)
 
         # Connect button
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.clicked.connect(self.accept)
-        layout.addWidget(self.connect_btn, 3, 0, 1, 2)
+        layout.addWidget(self.connect_btn, 7, 0, 1, 2)
 
         self.setLayout(layout)
 
+        # Initialize hints and defaults
+        self.on_channel_changed()
+
         # Make ID input focused
         self.id_input.setFocus()
+
+    def on_channel_changed(self):
+        """Update hints and defaults when connection type changes"""
+        if self.direct_radio.isChecked():
+            # Direct connection (local network)
+            self.ip_input.setPlaceholderText("e.g., 192.168.1.100")
+            self.ip_input.setText("")
+            self.info_label.setText(
+                "Direct connection: Local IP address\n"
+                "Video: RTSP stream directly from robot\n"
+                "Use for: Fiber optic, Ethernet, or WiFi in local network"
+            )
+        else:
+            # Internet connection (Tailscale)
+            self.ip_input.setPlaceholderText("e.g., 100.112.41.76")
+            self.ip_input.setText("100.112.41.76")  # Default Tailscale IP
+            self.info_label.setText(
+                "Internet connection: Tailscale VPN IP address\n"
+                "Video: RTSP stream via VPS (81.200.157.230)\n"
+                "Use for: Starlink, 4G/5G, or any remote access"
+            )
 
     def get_connection_info(self):
         """Return connection parameters"""
@@ -206,9 +258,13 @@ class ConnectDialog(QDialog):
         except ValueError:
             robot_id = 1
 
+        # Determine connection type
+        is_direct = self.direct_radio.isChecked()
+
         return {
             'robot_id': robot_id,
-            'host': self.ip_input.text()
+            'host': self.ip_input.text(),
+            'channel_type': 'direct' if is_direct else 'internet'
         }
 
 
@@ -687,8 +743,18 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout()
 
         # Left side: Video stream
-        # Note: Each robot has unique IP, so camera stream is already unique
-        rtsp_url = f"rtsp://81.200.157.230:8555/camera"
+        # RTSP URL depends on connection type
+        channel_type = connection_info.get('channel_type', 'internet')
+
+        if channel_type == 'direct':
+            # Direct connection: stream directly from robot
+            rtsp_url = f"rtsp://{connection_info['host']}:8554/camera"
+            channel_name = "Direct"
+        else:
+            # Internet connection: stream via VPS
+            rtsp_url = f"rtsp://81.200.157.230:8555/camera"
+            channel_name = "Internet"
+
         self.video_widget = VideoWidget(rtsp_url)
         main_layout.addWidget(self.video_widget, stretch=2)
 
@@ -696,7 +762,7 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout()
 
         # Connection status
-        status_label = QLabel(f"Robot #{robot_id} @ {connection_info['host']} (UDP)")
+        status_label = QLabel(f"Robot #{robot_id} @ {connection_info['host']} ({channel_name}, UDP)")
         status_label.setStyleSheet("background-color: green; color: white; padding: 10px; font-weight: bold;")
         right_layout.addWidget(status_label)
 
@@ -737,7 +803,14 @@ class MainWindow(QMainWindow):
         self.ping_thread.start()
 
         # Start ping thread for camera/VPS
-        self.camera_ping_thread = PingThread('81.200.157.230')
+        # For direct connection: ping robot (video comes from robot)
+        # For internet connection: ping VPS (video comes via VPS)
+        if channel_type == 'direct':
+            camera_ping_host = self.connection_info['host']
+        else:
+            camera_ping_host = '81.200.157.230'
+
+        self.camera_ping_thread = PingThread(camera_ping_host)
         self.camera_ping_thread.ping_result.connect(self.on_camera_ping_result)
         self.camera_ping_thread.start()
 
