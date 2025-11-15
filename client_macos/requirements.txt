@@ -1,5 +1,8 @@
 # VETER Robot Control Client - Dependencies
 
 PyQt6==6.7.0
-paramiko==3.4.0
 python-vlc==3.0.20123
+
+# ROS2 dependencies (requires ROS2 Humble installed on macOS)
+# Install ROS2 first: https://docs.ros.org/en/humble/Installation/macOS-Install-Binary.html
+# Then these will be available in the ROS2 environment
